@@ -1,0 +1,63 @@
+name: Linux validation and AppImage
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Qt host libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libfuse2 libarchive13
+      - run: pip install -e '.[dev]'
+      - run: ruff check src tests && ruff format --check src tests
+      - run: QT_QPA_PLATFORM=offscreen pytest -q
+      - name: Download and verify build tool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download continuous --repo AppImage/appimagetool --pattern appimagetool-x86_64.AppImage --dir /tmp
+          echo '95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6  /tmp/appimagetool-x86_64.AppImage' | sha256sum -c -
+          chmod +x /tmp/appimagetool-x86_64.AppImage
+      - name: Build AppImage
+        env:
+          APPIMAGETOOL: /tmp/appimagetool-x86_64.AppImage
+        run: packaging/build-appimage.sh
+      - name: Smoke-test packaged Qt and bundled BCJ2 support
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --smoke-test
+          dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --check-asi "$PWD/tests/fixtures/asi-bcj2.7z"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Reloaded-Linux-Manager-x86_64
+          path: |
+            dist/*.AppImage
+            dist/SHA256SUMS
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test-build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Reloaded-Linux-Manager-x86_64
+          path: artifacts
+      - name: Publish draft release for compatibility review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" artifacts/* --draft --title "$RELEASE_TAG" --notes 'Experimental Linux frontend. See README and docs/VALIDATION.md for verified scope and compatibility limits.'

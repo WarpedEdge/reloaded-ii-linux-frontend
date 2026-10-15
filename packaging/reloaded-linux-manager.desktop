@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Reloaded Linux Manager
+Comment=Set up official Reloaded-II for Steam Proton games
+Exec=reloaded-linux-manager
+Icon=reloaded-linux-manager
+Categories=Game;Utility;
+Terminal=false
+StartupNotify=true
