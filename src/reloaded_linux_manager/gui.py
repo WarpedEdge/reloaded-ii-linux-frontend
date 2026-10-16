@@ -2,8 +2,10 @@
 
 import argparse
 import html
-import json
 import logging
+import os
+import re
+import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -12,28 +14,43 @@ from PySide6.QtCore import (
     QDir,
     QEvent,
     QObject,
+    QPointF,
     QRunnable,
-    QStandardPaths,
+    QSize,
     Qt,
     QThreadPool,
     QTimer,
     QUrl,
     Signal,
 )
-from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPalette
+from PySide6.QtGui import (
+    QColor,
+    QDesktopServices,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+)
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
+    QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -42,31 +59,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
+    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from . import proton, service, shortcuts, steam
+from . import __version__, icons, proton, reset, service, shortcuts, steam, themes, updater, views
 from .integration import deploy, extract_asi, merge_options
+from .log_panel import LogPanel
 from .storage import load_settings, read_json, save_settings, state_home, write_json
-
-BUTTON_STYLE = """
-QPushButton, QToolButton {
-    background: #2c3848; color: #edf2f8; border: 1px solid #56657a;
-    border-radius: 5px; padding: 7px 10px;
-}
-QPushButton:hover, QToolButton:hover { background: #405976; border-color: #8fc5ff; }
-QPushButton:pressed, QToolButton:pressed { background: #1a395b; border-color: #acd4ff; }
-QPushButton:focus, QToolButton:focus { border: 2px solid #8fc5ff; }
-QPushButton:disabled, QToolButton:disabled { background: #252e3a; color: #8997aa; border-color: #394657; }
-QPushButton#primaryAction { background: #2766b0; color: white; font-weight: 600; }
-QPushButton#primaryAction:hover { background: #347fd2; border-color: #b3dbff; }
-QPushButton#primaryAction:pressed { background: #194b86; }
-QPushButton#primaryAction:disabled { background: #333e4c; color: #aab5c3; }
-QGroupBox { border: 1px solid #3c4b5f; border-radius: 6px; margin-top: 8px; padding: 9px; }
-QGroupBox::title { subcontrol-origin: margin; left: 10px; }
-"""
 
 STEP_LABELS = (
     "Find Proton environment",
@@ -74,7 +76,7 @@ STEP_LABELS = (
     "Add game in Reloaded-II",
     "Enable Steam loading",
     "Apply launch options",
-    "Test mods in game",
+    "Ready",
 )
 
 
@@ -84,13 +86,72 @@ def step_markup(guide, failure=None):
     rows = []
     for index, label in enumerate(STEP_LABELS):
         if index == failure:
-            color, mark = "#ff8994", "✗"
+            color, mark = themes.colors()["error"], "✗"
         elif 0 <= index < stage:
-            color, mark = "#77d994", "✓"
+            color, mark = themes.colors()["success"], "✓"
         else:
-            color, mark = "#83b8ff", "→" if index == stage else "•"
+            color, mark = themes.colors()["pending"], "→" if index == stage else "•"
         rows.append(f'<span style="color:{color}">{mark} &nbsp;{html.escape(label)}</span>')
     return "<br/>".join(rows)
+
+
+def navigation_icon(name):
+    """Theme-independent, high-contrast navigation glyphs at double resolution."""
+    pixmap = QPixmap(48, 48)
+    pixmap.setDevicePixelRatio(2)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor(themes.colors()["text"]), 2))
+    if name in ("backButton", "forwardButton", "toParentButton"):
+        points = {
+            "backButton": [(14, 5), (7, 12), (14, 19)],
+            "forwardButton": [(10, 5), (17, 12), (10, 19)],
+            "toParentButton": [(5, 14), (12, 7), (19, 14)],
+        }[name]
+        path = QPainterPath(QPointF(*points[0]))
+        for point in points[1:]:
+            path.lineTo(QPointF(*point))
+        painter.drawPath(path)
+        if name == "toParentButton":
+            painter.drawLine(12, 7, 12, 21)
+        else:
+            painter.drawLine(7, 12, 18, 12)
+    elif name == "newFolderButton":
+        path = QPainterPath(QPointF(3, 19))
+        for point in [(3, 5), (10, 5), (12, 8), (21, 8), (21, 19), (3, 19)]:
+            path.lineTo(QPointF(*point))
+        painter.drawPath(path)
+        painter.drawLine(12, 10, 12, 17)
+        painter.drawLine(8, 14, 16, 14)
+    elif name == "listModeButton":
+        for y in (6, 12, 18):
+            painter.drawLine(3, y, 5, y)
+            painter.drawLine(9, y, 21, y)
+    else:
+        painter.drawRect(3, 4, 18, 16)
+        painter.drawLine(3, 9, 21, 9)
+        painter.drawLine(9, 4, 9, 20)
+        painter.drawLine(3, 14, 21, 14)
+    painter.end()
+    return QIcon(pixmap)
+
+
+class LogHighlighter(QSyntaxHighlighter):
+    def highlightBlock(self, text):
+        color = None
+        if re.search(
+            r"\b(error|errors|exception|failed|failure|fatal)\b|:err:", text, re.I
+        ) and not re.search(r"\b(no|0) errors?\b", text, re.I):
+            color = themes.colors()["error"]
+        elif re.search(r"\b(warning|warn|pending|unverified|not tested)\b", text, re.I):
+            color = themes.colors()["warning"]
+        elif text.startswith(("OK:", "VERIFIED")):
+            color = themes.colors()["success"]
+        if color:
+            style = QTextCharFormat()
+            style.setForeground(QColor(color))
+            self.setFormat(0, len(text), style)
 
 
 def file_dialog(parent, title, start, pattern="", *, directory=False, save=False):
@@ -113,6 +174,46 @@ def file_dialog(parent, title, start, pattern="", *, directory=False, save=False
         dialog.setDirectory(str(start))
     if pattern:
         dialog.setNameFilter(pattern)
+    dialog.resize(1050, 680)
+    font = dialog.font()
+    font.setPointSize(max(11, font.pointSize()))
+    dialog.setFont(font)
+    navigation = {
+        "backButton": "Back",
+        "forwardButton": "Forward",
+        "toParentButton": "Up",
+        "newFolderButton": "New folder",
+        "listModeButton": "List",
+        "detailModeButton": "Details",
+    }
+    for button in dialog.findChildren(QToolButton):
+        if button.objectName() in navigation:
+            button.setIcon(navigation_icon(button.objectName()))
+            button.setText(navigation[button.objectName()])
+            button.setToolTip(navigation[button.objectName()])
+            button.setToolButtonStyle(Qt.ToolButtonIconOnly)
+            button.setIconSize(QSize(24, 24))
+            button.setFixedSize(40, 40)
+    splitter = dialog.findChild(QSplitter, "splitter")
+    if splitter:
+        splitter.setSizes([190, 800])
+    dialog.setStyleSheet("QFileDialog QTreeView::item, QFileDialog QListView::item { min-height: 26px; }")
+    location = dialog.findChild(QComboBox, "lookInCombo")
+    if location:
+        location.setEditable(True)
+        location.setInsertPolicy(QComboBox.NoInsert)
+        location.setEditText(dialog.directory().absolutePath())
+
+        def navigate():
+            value = Path(location.currentText()).expanduser()
+            if value.is_dir():
+                dialog.setDirectory(str(value))
+            elif value.is_file():
+                dialog.setDirectory(str(value.parent))
+                dialog.selectFile(value.name)
+
+        location.lineEdit().returnPressed.connect(navigate)
+        dialog.directoryEntered.connect(location.setEditText)
     return dialog
 
 
@@ -155,49 +256,119 @@ class SettingsDialog(QDialog):
     def __init__(self, settings, parent):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(650, 460)
+        self.resize(820, 580)
         self.settings = settings.copy()
-        layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs, 1)
+        appearance = QWidget()
+        appearance_layout = QVBoxLayout(appearance)
+        appearance_layout.addWidget(
+            QLabel("Theme — select a preview to try it. Save keeps your choice; Cancel restores it.")
+        )
+        grid = QGridLayout()
+        self.theme_group = QButtonGroup(self)
+        self.theme_buttons = {}
+        selected = settings.get("theme", "dark")
+        if selected not in themes.THEMES:
+            selected = "dark"
+        self.original_theme = selected
+        for index, (key, palette) in enumerate(themes.THEMES.items()):
+            button = QToolButton()
+            button.setText(palette["name"])
+            button.setIcon(themes.preview_icon(key))
+            button.setIconSize(QSize(110, 76))
+            button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            button.setCheckable(True)
+            button.setChecked(key == selected)
+            button.setMinimumSize(135, 115)
+            button.setProperty("themeKey", key)
+            button.clicked.connect(lambda _=False, name=key: parent.apply_theme(name))
+            self.theme_group.addButton(button)
+            self.theme_buttons[key] = button
+            grid.addWidget(button, index // 3, index % 3)
+        appearance_layout.addLayout(grid)
+        appearance_layout.addStretch()
+        self.tabs.addTab(appearance, "Appearance")
+        general = QWidget()
+        general_layout = QVBoxLayout(general)
+        self.tabs.addTab(general, "General")
+        self.rejected.connect(lambda: parent.apply_theme(self.original_theme))
+        self.auto_updates = QCheckBox("Check for updates when the app opens")
+        self.auto_updates.setChecked(settings.get("check_updates", True))
+        general_layout.addWidget(self.auto_updates)
+        explanation = QLabel("An available update is offered before anything is downloaded or replaced.")
+        explanation.setWordWrap(True)
+        general_layout.addWidget(explanation)
+        general_layout.addWidget(QLabel("Downloaded installer cache — keeps setup downloads for reuse:"))
+        row = QHBoxLayout()
+        self.cache = QLineEdit(settings["cache"])
+        row.addWidget(self.cache)
+        browse = QPushButton("Browse…")
+
+        def browse_cache():
+            path = choose_path(self, "Choose download cache folder", self.cache.text(), directory=True)
+            if path:
+                self.cache.setText(path)
+
+        browse.clicked.connect(browse_cache)
+        row.addWidget(browse)
+        general_layout.addLayout(row)
+        form = QFormLayout()
+        self.level = QComboBox()
+        for label, value in [
+            ("Normal", "INFO"),
+            ("Detailed troubleshooting", "DEBUG"),
+            ("Warnings and errors", "WARNING"),
+        ]:
+            self.level.addItem(label, value)
+        self.level.setCurrentIndex(max(0, self.level.findData(settings["log_level"])))
+        form.addRow("Log detail", self.level)
+        general_layout.addLayout(form)
+        general_layout.addStretch()
+        advanced = QWidget()
+        advanced_form = QFormLayout(advanced)
+        label = QLabel(
+            "Only use these if a game isn't found automatically. A Steam installation folder "
+            "contains config and steamapps; a game library folder contains steamapps and your games."
+        )
+        label.setWordWrap(True)
+        advanced_form.addRow(label)
         self.fields = {}
         for key, label in [
-            ("steam_roots", "Additional Steam roots (one per line)"),
-            ("libraries", "Additional library roots (one per line)"),
+            ("steam_roots", "Steam installation folders"),
+            ("libraries", "Extra game library folders"),
         ]:
             field = QPlainTextEdit("\n".join(settings[key]))
-            field.setMaximumHeight(90)
+            field.setMaximumHeight(80)
             self.fields[key] = field
-            layout.addRow(label, field)
-        for key, label in [
-            ("cache", "Download cache"),
-            ("release", "Release tag (or latest)"),
-            ("protontricks_launch", "protontricks-launch executable (optional)"),
-        ]:
-            field = QLineEdit(settings[key])
-            self.fields[key] = field
-            layout.addRow(label, field)
-        self.level = QComboBox()
-        self.level.addItems(["INFO", "DEBUG", "WARNING"])
-        self.level.setCurrentText(settings["log_level"])
-        layout.addRow("Logging verbosity", self.level)
-        layout.addRow(
-            QLabel(
-                "Proton tool selection is owned by Steam. Change it in game Properties → Compatibility.\n"
-                "Updates are explicit: choose a release tag, then click Update. No background updates."
-            )
-        )
+            row = QHBoxLayout()
+            row.addWidget(field)
+            add = QPushButton("Add folder…")
+
+            def append_folder(_=False, target=field):
+                folder = choose_path(self, "Choose folder", Path.home(), directory=True)
+                if folder:
+                    target.appendPlainText(folder)
+
+            add.clicked.connect(append_folder)
+            row.addWidget(add)
+            advanced_form.addRow(label, row)
+        self.tabs.addTab(advanced, "Advanced")
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        layout.addWidget(buttons)
 
     def value(self):
+        self.settings["theme"] = self.theme_group.checkedButton().property("themeKey")
+        self.settings["check_updates"] = self.auto_updates.isChecked()
+        self.settings["cache"] = self.cache.text().strip()
+        self.settings["log_level"] = self.level.currentData()
         for key, field in self.fields.items():
-            self.settings[key] = (
-                [line.strip() for line in field.toPlainText().splitlines() if line.strip()]
-                if isinstance(field, QPlainTextEdit)
-                else field.text().strip()
+            self.settings[key] = list(
+                dict.fromkeys(line.strip() for line in field.toPlainText().splitlines() if line.strip())
             )
-        self.settings["log_level"] = self.level.currentText()
         return self.settings
 
 
@@ -206,6 +377,9 @@ class Window(QMainWindow):
         super().__init__()
         self.settings = load_settings()
         self.games = []
+        self.game_icons = {}
+        self.checking_updates = False
+        self._details_key = object()
         self.visible = []
         self.workers = set()
         self.busy = False
@@ -215,31 +389,41 @@ class Window(QMainWindow):
         self.pending_game_key = None
         self.setWindowTitle("Reloaded Linux Manager")
         self.resize(1240, 840)
-        self.setStyleSheet(BUTTON_STYLE)
+        themes.apply(self.settings.get("theme", "dark"))
         root = QWidget()
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
+        topbar = QHBoxLayout()
         heading = QLabel("Reloaded Linux Manager")
-        heading.setStyleSheet("font-size: 25px; font-weight: 600; padding: 8px")
-        outer.addWidget(heading)
-        outer.addWidget(QLabel("Choose a game. We’ll guide you through the next step."))
-        tools = QHBoxLayout()
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Search installed games or App ID…")
-        self.search.textChanged.connect(self.filter_games)
-        tools.addWidget(self.search)
+        heading.setStyleSheet("font-size: 23px; font-weight: 600; padding: 8px")
+        topbar.addWidget(heading)
+        topbar.addStretch()
+        version_badge = QLabel("Ver: " + __version__.removesuffix(".0"))
+        version_badge.setObjectName("versionBadge")
+        version_badge.setToolTip("Manager version")
+        topbar.addWidget(version_badge, alignment=Qt.AlignVCenter)
         self.actions = []
         for label, action in [
             ("Refresh", self.refresh),
-            ("Add game manually", self.manual),
+            ("Add game", self.manual),
             ("Settings", self.settings_dialog),
+            ("About", self.about),
         ]:
             button = QPushButton(label)
             button.clicked.connect(action)
             self.actions.append(button)
-            tools.addWidget(button)
-        outer.addLayout(tools)
+            topbar.addWidget(button)
+        outer.addLayout(topbar)
         splitter = QSplitter()
+        sidebar = QWidget()
+        sidebar.setMinimumWidth(250)
+        sidebar.setMaximumWidth(360)
+        library_layout = QVBoxLayout(sidebar)
+        library_layout.setContentsMargins(0, 0, 0, 0)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search games…")
+        self.search.textChanged.connect(self.filter_games)
+        library_layout.addWidget(self.search)
         self.library = QListWidget()
         self.library.setMinimumWidth(240)
         self.library.setMaximumWidth(360)
@@ -247,7 +431,12 @@ class Window(QMainWindow):
         self.library.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.library.setSpacing(6)
         self.library.currentRowChanged.connect(self.details)
-        splitter.addWidget(self.library)
+        self.library.setIconSize(QSize(32, 32))
+        self.library.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.library.customContextMenuRequested.connect(self.game_context_menu)
+        library_layout.addWidget(self.library)
+        library_layout.addWidget(QLabel("Right-click a game to favorite it"))
+        splitter.addWidget(sidebar)
         right = QWidget()
         panel = QVBoxLayout(right)
         header = QHBoxLayout()
@@ -266,7 +455,7 @@ class Window(QMainWindow):
         self.technical.setTextFormat(Qt.PlainText)
         self.technical.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.technical.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.technical.setStyleSheet("color: #b8c4d4; font-size: 12px")
+        self.technical.setObjectName("technicalDetails")
         summary.addWidget(self.technical)
         summary.addStretch()
         header.addLayout(summary, 3)
@@ -311,17 +500,34 @@ class Window(QMainWindow):
         self.more.setText("More actions")
         self.more.setPopupMode(QToolButton.InstantPopup)
         self.more_menu = QMenu(self.more)
-        for label, action in [
-            ("Check setup", self.check),
-            ("Launch game", self.launch_game),
-            ("Repair installation", self.setup),
-            ("Update Reloaded-II", self.setup),
-            ("Select existing prefix", self.select_prefix),
-            ("Remove integration", self.remove),
-            ("View configuration", self.configuration),
-            ("View logs", self.logs),
+        self.more_menu.setToolTipsVisible(True)
+        for label, action, tooltip in [
+            (
+                "Reinstall Reloaded-II…",
+                self.setup,
+                "Download the selected official release and reinstall its program files and prerequisites. Keeps mods, profiles, registration and Steam loading. This may also update Reloaded-II.",
+            ),
+            (
+                "Select existing prefix",
+                self.select_prefix,
+                "Locate this game's existing Proton Windows environment when automatic detection fails. Does not create or reset it.",
+            ),
+            (
+                "Disconnect Steam mod loading…",
+                self.remove,
+                "Restore the game files changed by ASI deployment and remove its application shortcut. Keeps Reloaded-II and mods. Steam launch options need manual review.",
+            ),
         ]:
-            self.more_menu.addAction(label, action)
+            item = self.more_menu.addAction(label, action)
+            item.setToolTip(tooltip)
+        self.reset_action = self.more_menu.addAction("Reset all Reloaded-II setup…", self.reset_all)
+        self.reset_action.setToolTip(
+            "Back up and remove this game's Reloaded-II installation, mods, settings, registration, ASI files and game shortcut. Keeps the game, saves, Proton prefix and Windows runtimes."
+        )
+        self.restore_action = self.more_menu.addAction("Restore last full reset…", self.restore_reset)
+        self.restore_action.setToolTip(
+            "Undo the last full reset if no new setup or changed loader files conflict with it."
+        )
         self.more.setMenu(self.more_menu)
         self.actions.append(self.more)
         self.more.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
@@ -331,28 +537,44 @@ class Window(QMainWindow):
             button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         panel.addLayout(secondary)
         shortcut_row = QHBoxLayout()
-        self.reloaded_shortcut = QPushButton("Create Reloaded-II desktop shortcut")
-        self.reloaded_shortcut.clicked.connect(self.create_reloaded_shortcut)
+        self.reloaded_shortcut = QPushButton("Add Reloaded-II to applications")
+        self.reloaded_shortcut.clicked.connect(self.toggle_reloaded_shortcut)
         self.actions.append(self.reloaded_shortcut)
         shortcut_row.addWidget(self.reloaded_shortcut, 1)
-        self.manager_shortcut = QPushButton("Create manager AppImage shortcut")
-        self.manager_shortcut.clicked.connect(self.create_manager_shortcut)
+        self.manager_shortcut = QPushButton("Add manager to applications")
+        self.manager_shortcut.clicked.connect(self.toggle_manager_shortcut)
         self.actions.append(self.manager_shortcut)
         shortcut_row.addWidget(self.manager_shortcut, 1)
         for button in (self.reloaded_shortcut, self.manager_shortcut):
             button.setMinimumHeight(40)
         panel.addLayout(shortcut_row)
-        panel.addWidget(QLabel("Activity"))
+
         self.progress = QProgressBar()
         self.progress.hide()
         panel.addWidget(self.progress)
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
-        self.output.setPlaceholderText(
-            "Setup steps and diagnostics appear here. Setup remains pending until verified in game."
-        )
+        self.activity_highlighter = LogHighlighter(self.output.document())
+        self.output.setPlaceholderText("Actions and setup messages appear here.")
         self.output.setMinimumHeight(150)
-        panel.addWidget(self.output, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.output, "Activity")
+        self.log_panel = LogPanel(lambda: self.game, Worker, LogHighlighter, self)
+        self.log_panel.clear_requested.connect(self.clear_logs)
+        self.logs_output = self.log_panel.text
+        self.log_panel.unread_changed.connect(
+            lambda unread: self.tabs.setTabText(1, "Logs ●" if unread else "Logs")
+        )
+        self.tabs.addTab(self.log_panel, "Logs")
+        setup_panel = QWidget()
+        setup_layout = QVBoxLayout(setup_panel)
+        self.setup_output = QPlainTextEdit()
+        self.setup_output.setReadOnly(True)
+        self.details_highlighter = LogHighlighter(self.setup_output.document())
+        setup_layout.addWidget(self.setup_output)
+        self.tabs.addTab(setup_panel, "Setup details")
+        self.tabs.currentChanged.connect(self.display_tab)
+        panel.addWidget(self.tabs, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(1, 2)
         outer.addWidget(splitter, 1)
@@ -404,6 +626,7 @@ class Window(QMainWindow):
         self.progress.hide()
         self.statusBar().showMessage("Ready")
         self.details()
+        QTimer.singleShot(0, lambda: self.display_tab(self.tabs.currentIndex()))
 
     def message(self, text):
         self.output.appendPlainText(text)
@@ -416,7 +639,7 @@ class Window(QMainWindow):
 
     def refresh(self):
         def done(result):
-            self.games, warnings = result
+            self.games, warnings, self.game_icons = result
             self.filter_games()
             for warning in warnings:
                 self.message(warning)
@@ -425,7 +648,15 @@ class Window(QMainWindow):
                     "No Steam games found. Add a Steam root in Settings or select a game's appmanifest manually."
                 )
 
-        self.work(lambda _: steam.discover(self.settings), done)
+        def load(_):
+            games, warnings = steam.discover(self.settings)
+            return (
+                games,
+                warnings,
+                {g.key: icons.library_icon(g) for g in games if not steam.is_support_tool(g)},
+            )
+
+        self.work(load, done)
 
     def filter_games(self):
         text = self.search.text().lower()
@@ -435,8 +666,21 @@ class Window(QMainWindow):
             g for g in self.games if text in (g.name + " " + g.appid).lower() and not steam.is_support_tool(g)
         ]
         self.library.clear()
+        favorites = set(self.settings.get("favorites", []))
+        self.visible.sort(key=lambda g: (g.key not in favorites, g.name.casefold(), g.key))
         for game in self.visible:
-            self.library.addItem(game.name)
+            icon = (
+                (
+                    QIcon.fromTheme(self.game_icons[game.key][6:])
+                    if self.game_icons[game.key].startswith("theme:")
+                    else QIcon(self.game_icons[game.key])
+                )
+                if self.game_icons.get(game.key)
+                else QIcon.fromTheme("applications-games")
+            )
+            item = QListWidgetItem(icon, ("★  " if game.key in favorites else "") + game.name)
+            item.setToolTip(game.name)
+            self.library.addItem(item)
         if self.visible:
             self.library.setCurrentRow(next((i for i, g in enumerate(self.visible) if g.key == selected), 0))
 
@@ -450,7 +694,20 @@ class Window(QMainWindow):
         self.deploy_button.setEnabled(False)
         self.options_button.setEnabled(False)
         self.reloaded_shortcut.setEnabled(False)
+        game_shortcut = bool(game and shortcuts.menu_shortcut_exists(game))
+        self.reloaded_shortcut.setText(
+            "Remove Reloaded-II from applications" if game_shortcut else "Add Reloaded-II to applications"
+        )
+        self.manager_shortcut.setText(
+            "Remove manager from applications"
+            if shortcuts.menu_shortcut_exists()
+            else "Add manager to applications"
+        )
+        self.manager_shortcut.setEnabled(not self.busy)
+        self.log_panel.refresh()
         self.more.setEnabled(bool(game) and not self.busy)
+        self.reset_action.setEnabled(bool(game and game.prefix) and not self.busy)
+        self.restore_action.setEnabled(bool(game and reset.pointer(game).is_file()) and not self.busy)
         if not game:
             self.title.setText("Select a Steam game")
             self.info.clear()
@@ -460,12 +717,14 @@ class Window(QMainWindow):
             self.steps.setText(step_markup({}))
             self.technical.clear()
             return
+        QTimer.singleShot(0, lambda: self.display_tab(self.tabs.currentIndex()))
         self.title.setText(game.name)
         self.title.setTextFormat(Qt.PlainText)
         self.info.setText(f"Steam game {game.appid} · {game.tool}")
         self.technical.setText(
-            f"Game: {game.directory}\nSteam root: {game.steam}\n"
-            f"Prefix: {game.prefix or 'Not initialized or ambiguous'}"
+            f"Steam: {game.steam}\nGame: {game.directory}\n"
+            f"Prefix: {game.prefix or 'Not initialized or ambiguous'}\n"
+            "Reloaded-II: Checking…"
         )
         self.next_heading.setText("Checking your setup…")
         self.next_text.setText("Finding the next step for this game.")
@@ -477,6 +736,12 @@ class Window(QMainWindow):
             if generation != self.inspection:
                 return
             self.guide = guide
+            state = read_json(service.metadata(game), {})
+            self.technical.setText(
+                f"Steam: {game.steam}\nGame: {game.directory}\n"
+                f"Prefix: {game.prefix or 'Not initialized or ambiguous'}\n"
+                f"Reloaded-II: {state.get('version', 'Not installed by this manager')}"
+            )
             self.next_heading.setText(guide["heading"])
             self.next_text.setText(guide["text"])
             self.primary.setText(guide["button"])
@@ -484,7 +749,7 @@ class Window(QMainWindow):
             self.open_button.setEnabled(not self.busy and guide["stage"] >= 2)
             self.deploy_button.setEnabled(not self.busy and guide["stage"] >= 3)
             self.options_button.setEnabled(not self.busy and guide["stage"] >= 4)
-            self.reloaded_shortcut.setEnabled(not self.busy and guide["stage"] >= 2)
+            self.reloaded_shortcut.setEnabled(not self.busy and (game_shortcut or guide["stage"] >= 2))
             failure = self.failures.get(game.key)
             if failure is not None and guide["stage"] > failure:
                 self.failures.pop(game.key, None)
@@ -584,7 +849,7 @@ class Window(QMainWindow):
                 )
             state["asi"] = deploy(game, Path(filename), service.backups(game))
             write_json(service.metadata(game), state)
-            return "ASI files deployed and hashed. Copy Steam launch options next; in-game verification is still required."
+            return "ASI files deployed and hashed. Copy Steam launch options next; finish the remaining configuration checks next."
 
         self.work(action, failure_step=3)
 
@@ -688,20 +953,25 @@ class Window(QMainWindow):
 
         self.work(resolve, done)
 
-    def shortcut_destination(self, filename):
-        desktop = QStandardPaths.writableLocation(QStandardPaths.DesktopLocation) or str(Path.home())
-        return choose_path(
-            self, "Save desktop shortcut", Path(desktop) / filename, "Desktop shortcut (*.desktop)", save=True
-        )
+    def toggle_reloaded_shortcut(self):
+        if self.game and shortcuts.menu_shortcut_exists(self.game):
+            self.remove_game_shortcut()
+        else:
+            self.create_reloaded_shortcut()
+
+    def toggle_manager_shortcut(self):
+        if shortcuts.menu_shortcut_exists():
+            self.remove_manager_shortcut()
+        else:
+            self.create_manager_shortcut()
 
     def create_reloaded_shortcut(self):
         game = self.game
-        if not game:
-            return
-        destination = self.shortcut_destination(f"Reloaded-II-{game.appid}.desktop")
-        if destination:
+        if game:
             self.work(
-                lambda _: shortcuts.save_shortcut(destination, shortcuts.reloaded_entry(game, self.settings))
+                lambda _: shortcuts.install_menu_shortcut(
+                    shortcuts.reloaded_entry(game, self.settings), game=game
+                )
             )
 
     def create_manager_shortcut(self):
@@ -713,15 +983,52 @@ class Window(QMainWindow):
             if not filename:
                 return
             image = Path(filename)
-        destination = self.shortcut_destination("Reloaded-Linux-Manager.desktop")
-        if destination:
-            self.work(lambda _: shortcuts.save_shortcut(destination, shortcuts.manager_entry(image)))
+        self.work(lambda _: shortcuts.install_menu_shortcut(shortcuts.manager_entry(image)))
+
+    def remove_game_shortcut(self):
+        game = self.game
+        if game:
+            self.work(lambda _: shortcuts.remove_menu_shortcut(game))
+
+    def remove_manager_shortcut(self):
+        self.work(lambda _: shortcuts.remove_menu_shortcut())
+
+    def game_context_menu(self, position):
+        item = self.library.itemAt(position)
+        if item is None or self.busy:
+            return
+        game = self.visible[self.library.row(item)]
+        menu = QMenu(self)
+        favorite = game.key in self.settings.get("favorites", [])
+        action = menu.addAction("Remove from favorites" if favorite else "Favorite")
+        if menu.exec(self.library.viewport().mapToGlobal(position)) == action:
+            self.toggle_favorite(game)
+
+    def toggle_favorite(self, game):
+        favorites = set(self.settings.get("favorites", []))
+        if game.key in favorites:
+            favorites.remove(game.key)
+        else:
+            favorites.add(game.key)
+        self.settings["favorites"] = sorted(favorites)
+        save_settings(self.settings)
+        self.pending_game_key = self.game.key if self.game else game.key
+        self.filter_games()
+
+    def apply_theme(self, key):
+        themes.apply(key)
+        self.steps.setText(
+            step_markup(self.guide or {}, self.failures.get(self.game.key) if self.game else None)
+        )
+        for highlighter in (self.activity_highlighter, self.log_panel.highlighter, self.details_highlighter):
+            highlighter.rehighlight()
 
     def settings_dialog(self):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
             self.settings = dialog.value()
             save_settings(self.settings)
+            self.apply_theme(self.settings.get("theme", "dark"))
             logging.getLogger().setLevel(self.settings["log_level"])
             self.refresh()
 
@@ -731,24 +1038,217 @@ class Window(QMainWindow):
             game
             and QMessageBox.question(
                 self,
-                "Remove managed ASI integration",
-                "Remove only unchanged ASI files deployed by this manager? Reloaded-II, mods, prefixes and runtimes will be preserved.",
+                "Disconnect Steam mod loading",
+                "Remove this manager’s Steam mod-loading files and game application shortcut? Reloaded-II, mods, saves and the Windows environment will be kept. You will need to remove the related DLL override from Steam launch options yourself.",
             )
             == QMessageBox.Yes
         ):
             self.work(lambda _: service.remove_asi(game))
 
-    def configuration(self):
-        if self.game:
-            self.message(json.dumps(read_json(service.metadata(self.game), {}), indent=2))
-            if self.game.prefix:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.game.install)))
-
-    def logs(self):
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(state_home())))
-        self.message(
-            "Logs contain local paths and upstream process output. Review/redact usernames and paths before sharing on GitHub."
+    def reset_all(self):
+        game = self.game
+        if not game:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Reset all Reloaded-II setup",
+            "Close the game and Reloaded-II first.\n\n"
+            "This backs up and removes this game's managed Reloaded-II installation, ALL its mods, "
+            "settings and registrations, ASI integration and game application shortcut. "
+            "The backup stays inside the Proton prefix under drive_c/ReloadedLinuxManager/ResetBackups.\n\n"
+            "The game, saves, Proton prefix, Windows runtimes and manager shortcut are kept. "
+            "Steam launch options remain unchanged; review the old DLL override afterward.\n\n"
+            "Return this game to the first Reloaded-II setup step?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
+        if answer == QMessageBox.Yes:
+            self.work(lambda report: reset.full_reset(game, report))
+
+    def restore_reset(self):
+        game = self.game
+        if (
+            game
+            and QMessageBox.question(
+                self,
+                "Restore previous Reloaded-II setup",
+                "Close the game and Reloaded-II first. Restore the last full-reset backup? "
+                "A new setup or externally changed loader files will be preserved instead of overwritten.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            == QMessageBox.Yes
+        ):
+            self.work(lambda _: reset.restore(game))
+
+    def display_tab(self, index):
+        if self.busy:
+            return
+        key = self.game.key if self.game else None
+        if index == 1:
+            self.logs(force=False)
+        elif index == 2 and self._details_key != key:
+            self.configuration()
+
+    def configuration(self):
+        game = self.game
+        if self.tabs.currentIndex() != 2:
+            self.tabs.setCurrentIndex(2)
+            return
+        if game:
+
+            def done(text):
+                self._details_key = game.key
+                self.setup_output.setPlainText(text)
+
+            self.work(lambda _: views.setup_details(game), done)
+        else:
+            self._details_key = None
+            self.setup_output.setPlainText("Choose a game to view its setup details.")
+
+    def logs(self, force=True):
+        if self.tabs.currentIndex() != 1:
+            self.tabs.setCurrentIndex(1)
+            return
+        self.log_panel.refresh(force=force)
+
+    def clear_logs(self):
+        game = self.game
+        if (
+            QMessageBox.question(
+                self,
+                "Clear logs",
+                "Close the game and Reloaded-II first. Clear saved manager logs and the recent Reloaded-II logs displayed for this game? This only clears log text; mods and settings are kept.",
+            )
+            != QMessageBox.Yes
+        ):
+            return
+
+        def done(text):
+            self.output.clear()
+            self.log_panel.last_read = None
+            self.message(text)
+            self.log_panel.refresh(force=True)
+
+        self.work(lambda _: views.clear_logs(game), done)
+
+    def about(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("About Reloaded Linux Manager")
+        dialog.resize(570, 330)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(
+            QLabel(f"Reloaded Linux Manager {__version__.removesuffix('.0')}\nAuthor: WarpedEdge")
+        )
+        text = QLabel(
+            "A native Linux frontend to help set up and launch Reloaded-II for your games.\n"
+            "Uses official Reloaded-II through the game’s Steam Proton environment."
+        )
+        text.setWordWrap(True)
+        layout.addWidget(text)
+        repository = QPushButton("Open GitHub project")
+        repository.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(updater.PROJECT_URL)))
+        layout.addWidget(repository)
+        check = QPushButton("Check for updates")
+        check.clicked.connect(lambda: (dialog.accept(), self.check_updates()))
+        layout.addWidget(check)
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.rejected.connect(dialog.reject)
+        layout.addWidget(close)
+        dialog.exec()
+
+    def check_updates(self, automatic=False):
+        if automatic and not self.settings.get("check_updates", True):
+            return
+        if self.checking_updates:
+            return
+        if self.busy:
+            QTimer.singleShot(3000, lambda: self.check_updates(automatic))
+            return
+        self.checking_updates = True
+        worker = Worker(lambda _: updater.check_update())
+        self.workers.add(worker)
+
+        def done(result):
+            self.message(result["message"])
+            if result["status"] == "available":
+                self.offer_update(result)
+            elif not automatic:
+                QMessageBox.information(self, "Manager updates", result["message"])
+
+        def failed(text):
+            self.message("Update check unavailable: " + text)
+            if not automatic:
+                QMessageBox.information(self, "Manager updates", text)
+
+        def finished():
+            self.checking_updates = False
+            self.workers.discard(worker)
+
+        worker.signals.done.connect(done)
+        worker.signals.failed.connect(failed)
+        worker.signals.finished.connect(finished)
+        QThreadPool.globalInstance().start(worker)
+
+    def offer_update(self, release):
+        if self.busy:
+            QTimer.singleShot(2000, lambda: self.offer_update(release))
+            return
+        image = shortcuts.find_appimage()
+        if image is None:
+            QMessageBox.information(
+                self,
+                "Manager update available",
+                release["message"] + " Run the manager AppImage to install updates in-app.",
+            )
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Manager update available",
+                release["message"]
+                + "\nDownload and install it now? The current AppImage will be backed up; its filename and application shortcut will stay the same.",
+            )
+            != QMessageBox.Yes
+        ):
+            return
+
+        def installed(result):
+            self.message("Manager update installed. Previous AppImage: " + result["backup"])
+            # Schedule the restart prompt after the worker's finished signal clears busy.
+            QTimer.singleShot(0, lambda: self.restart_updated(result["path"]))
+
+        self.work(lambda report: updater.install_update(image, release["asset"], report), installed)
+
+    def restart_updated(self, filename):
+        if (
+            QMessageBox.question(self, "Update installed", "Restart into the new manager version now?")
+            != QMessageBox.Yes
+        ):
+            return
+        env = os.environ.copy()
+        original = env.pop("LD_LIBRARY_PATH_ORIG", None)
+        env.pop("LD_LIBRARY_PATH", None)
+        if original:
+            env["LD_LIBRARY_PATH"] = original
+        for name in (
+            "APPIMAGE",
+            "APPDIR",
+            "QT_PLUGIN_PATH",
+            "QML2_IMPORT_PATH",
+            "PYTHONHOME",
+            "PYTHONPATH",
+            "LIBARCHIVE",
+            "LD_PRELOAD",
+        ):
+            env.pop(name, None)
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        try:
+            subprocess.Popen([filename], env=env, start_new_session=True)
+        except OSError as exc:
+            self.error("Update is installed, but restart failed: " + str(exc))
+            return
+        self.close()
 
     def closeEvent(self, event):
         if self.busy:
@@ -759,12 +1259,13 @@ class Window(QMainWindow):
             )
             event.ignore()
         else:
+            self.log_panel.stop()
             event.accept()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Native setup companion for official Reloaded-II")
-    parser.add_argument("--version", action="version", version="Reloaded Linux Manager 0.1.0")
+    parser.add_argument("--version", action="version", version=f"Reloaded Linux Manager {__version__}")
     parser.add_argument(
         "--smoke-test", action="store_true", help="Open Qt, discover Steam, and exit without game changes"
     )
@@ -790,32 +1291,13 @@ def main():
     app.setApplicationName("Reloaded Linux Manager")
     app.setOrganizationName("ReloadedLinuxManager")
     app.setStyle("Fusion")
-    app.setStyleSheet(BUTTON_STYLE)
     app.button_cursor = ButtonCursor(app)
     app.installEventFilter(app.button_cursor)
-    palette = QPalette()
-    for role, color in [
-        (QPalette.Window, "#1b222c"),
-        (QPalette.WindowText, "#edf2f8"),
-        (QPalette.Base, "#141b24"),
-        (QPalette.AlternateBase, "#232d3a"),
-        (QPalette.Text, "#edf2f8"),
-        (QPalette.Button, "#2c3848"),
-        (QPalette.ButtonText, "#edf2f8"),
-        (QPalette.Highlight, "#285e96"),
-        (QPalette.HighlightedText, "#ffffff"),
-        (QPalette.ToolTipBase, "#edf2f8"),
-        (QPalette.ToolTipText, "#141b24"),
-        (QPalette.PlaceholderText, "#a8b5c6"),
-    ]:
-        palette.setColor(role, QColor(color))
-    palette.setColor(QPalette.Disabled, QPalette.Text, QColor("#8d9aab"))
-    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor("#8d9aab"))
-    app.setPalette(palette)
+    themes.apply(load_settings().get("theme", "dark"))
     icon = (
-        Path(sys._MEIPASS) / "reloaded-linux-manager.svg"
+        Path(sys._MEIPASS) / "reloaded-linux-manager.png"
         if getattr(sys, "frozen", False)
-        else Path(__file__).resolve().parents[2] / "packaging/reloaded-linux-manager.svg"
+        else Path(__file__).resolve().parents[2] / "packaging/reloaded-linux-manager.png"
     )
     if icon.is_file():
         app.setWindowIcon(QIcon(str(icon)))
@@ -824,12 +1306,18 @@ def main():
     if args.smoke_test:
 
         def finish_smoke():
-            if window.busy:
+            if window.busy or window.workers or window.log_panel.jobs:
                 QTimer.singleShot(100, finish_smoke)
             else:
+                window.log_panel.stop()
                 print("Native Qt smoke test passed", flush=True)
                 app.quit()
 
         QTimer.singleShot(100, finish_smoke)
         QTimer.singleShot(30000, lambda: app.exit(1))
-    sys.exit(app.exec())
+    if not args.smoke_test:
+        QTimer.singleShot(2000, lambda: window.check_updates(automatic=True))
+    exit_code = app.exec()
+    window.log_panel.stop()
+    QThreadPool.globalInstance().waitForDone()
+    sys.exit(exit_code)

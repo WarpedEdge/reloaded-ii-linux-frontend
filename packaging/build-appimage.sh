@@ -9,14 +9,14 @@ if [ ! -f "$RLM_LIBARCHIVE" ]; then
 fi
 python -m PyInstaller --noconfirm --clean --windowed --name reloaded-linux-manager \
     --collect-all libarchive --collect-all vdf --add-binary "$RLM_LIBARCHIVE:." \
-    --runtime-hook packaging/runtime-hook.py --add-data "packaging/reloaded-linux-manager.svg:." packaging/entry.py
+    --runtime-hook packaging/runtime-hook.py --add-data "packaging/reloaded-linux-manager.png:." packaging/entry.py
 rm -rf AppDir
-mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps
+mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/512x512/apps
 cp -a dist/reloaded-linux-manager/. AppDir/usr/bin/
 cp packaging/reloaded-linux-manager.desktop AppDir/
 cp packaging/reloaded-linux-manager.desktop AppDir/usr/share/applications/
-cp packaging/reloaded-linux-manager.svg AppDir/
-cp packaging/reloaded-linux-manager.svg AppDir/usr/share/icons/hicolor/scalable/apps/
+cp packaging/reloaded-linux-manager.png AppDir/
+cp packaging/reloaded-linux-manager.png AppDir/usr/share/icons/hicolor/512x512/apps/
 cat > AppDir/AppRun <<'RUN'
 #!/bin/sh
 APPDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"

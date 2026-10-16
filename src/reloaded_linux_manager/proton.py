@@ -59,8 +59,25 @@ def run(game, executable, launcher, args=(), log_path=None):
         env.pop("LD_PRELOAD", None)
     if log_path:
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("ab") as stream:
-            result = subprocess.run(argv, env=env, stdout=stream, stderr=subprocess.STDOUT)
+        import logging
+        from logging.handlers import RotatingFileHandler
+
+        handler = RotatingFileHandler(log_path, maxBytes=2 * 1024**2, backupCount=2, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S%z"))
+
+        def record(message):
+            handler.handle(logging.LogRecord("proton", logging.INFO, "", 0, message, (), None))
+
+        try:
+            record(f"=== Launch started: {game.name} (Steam {game.appid}) — {executable.name} ===")
+            with subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
+                while chunk := process.stdout.readline(65536):
+                    record(chunk.decode("utf-8", errors="replace").rstrip("\r\n"))
+                code = process.wait()
+            record(f"=== Launch ended: exit code {code} ===")
+            result = subprocess.CompletedProcess(argv, code)
+        finally:
+            handler.close()
     else:
         result = subprocess.run(argv, env=env, capture_output=True)
     if result.returncode:

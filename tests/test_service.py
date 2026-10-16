@@ -47,7 +47,7 @@ def test_install_preserves_mods_and_uses_official_dependencies_mode(tmp_path, mo
     calls = []
     monkeypatch.setattr(service.proton, "run", lambda *args: calls.append(args))
     result = service.install(game, {"cache": str(tmp_path)}, lambda _: None)
-    assert "not yet verified" in result
+    assert "configuration is pending" in result
     assert mod.read_bytes() == b"user mod"
     assert calls[0][3] == [
         "--dependenciesOnly",
@@ -139,3 +139,38 @@ def test_guide_does_not_mark_registration_complete_from_loader_config_alone(tmp_
         },
     )
     assert service.setup_guide(game)["stage"] == 2
+
+
+def test_ready_means_verified_configuration_and_changed_asi_is_failed(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    from reloaded_linux_manager.storage import digest
+
+    game = prepared(tmp_path, monkeypatch)
+    game = replace(game, launch_options=('WINEDLLOVERRIDES="version=n,b" %command%',))
+    game.install.mkdir(parents=True)
+    (game.install / "Reloaded-II.exe").touch()
+    executable = game.directory / "game.exe"
+    executable.touch()
+    (game.prefix / "dosdevices").mkdir()
+    (game.prefix / "dosdevices/z:").symlink_to("/")
+    base = "C:/" + str(game.install.relative_to(game.prefix / "drive_c"))
+    config = game.prefix / "drive_c/users/steamuser/AppData/Roaming/Reloaded-Mod-Loader-II/ReloadedII.json"
+    write_json(
+        config,
+        {
+            "LoaderPath64": base + "/Loader/X64/Reloaded.Mod.Loader.dll",
+            "ApplicationConfigDirectory": base + "/Apps",
+        },
+    )
+    write_json(game.install / "Apps/game/AppConfig.json", {"AppLocation": "Z:" + str(executable)})
+    proxy = game.directory / "version.dll"
+    proxy.write_bytes(b"official loader fixture")
+    write_json(service.metadata(game), {"asi": {"dll": "version", "files": {str(proxy): digest(proxy)}}})
+    guide = service.setup_guide(game)
+    assert guide["stage"] == 6 and guide["heading"] == "Ready"
+    assert "Mod compatibility" in guide["text"]
+    assert "OK: Setup checks passed. Ready to launch." in service.diagnostics(game)
+    proxy.write_bytes(b"changed")
+    guide = service.setup_guide(game)
+    assert guide["failed_step"] == 3 and guide["stage"] == 3

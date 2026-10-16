@@ -57,6 +57,38 @@ def test_manager_shortcut_keeps_original_appimage_path(tmp_path, monkeypatch):
     image.touch()
     image.chmod(0o755)
     monkeypatch.setenv("APPIMAGE", str(image))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     assert shortcuts.find_appimage() == image
     assert f'Exec="{image}"' in shortcuts.manager_entry(image)
     assert ".mount_" not in shortcuts.manager_entry(image)
+
+
+def test_application_menu_shortcuts_have_stable_names_and_can_be_removed(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    game = Game("1004640", "FINAL FANTASY: TACTICS / Test", tmp_path, tmp_path, tmp_path, None, "")
+    content = shortcuts.desktop_entry("Reloaded-II", ["/bin/true"])
+    shortcuts.install_menu_shortcut(content, game=game)
+    expected = tmp_path / "data/applications/Reloaded-II-FINAL-FANTASY-TACTICS-Test.desktop"
+    assert expected.is_file()
+    shortcuts.install_menu_shortcut(content, game=game)
+    assert len(list(expected.parent.glob("*.desktop"))) == 1
+    shortcuts.remove_menu_shortcut(game)
+    assert not expected.exists()
+
+
+def test_application_menu_preserves_unrelated_and_changed_entries(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    target = shortcuts.applications_home() / "Reloaded-Linux-Manager.desktop"
+    target.parent.mkdir(parents=True)
+    target.write_text("another program")
+    with pytest.raises(ValueError, match="unrelated"):
+        shortcuts.install_menu_shortcut("new")
+    assert target.read_text() == "another program"
+    target.unlink()
+    shortcuts.install_menu_shortcut("managed")
+    target.write_text("external edit")
+    with pytest.raises(ValueError, match="changed outside"):
+        shortcuts.remove_menu_shortcut()
+    assert target.read_text() == "external edit"

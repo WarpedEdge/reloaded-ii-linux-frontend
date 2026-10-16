@@ -117,9 +117,17 @@ def install(game, settings, report):
         if conflicts:
             report("Rollback preserved externally changed files: " + ", ".join(conflicts))
         raise
+    try:
+        from .shortcuts import refresh_game_shortcut
+
+        result = refresh_game_shortcut(game, settings)
+        if result:
+            report(result)
+    except (OSError, ValueError, RuntimeError) as exc:
+        report("Installation finished, but its application shortcut needs attention: " + str(exc))
     report("6. Open Reloaded-II, add your game executable, and close it. Then use Deploy ASI Loader here.")
-    report("7–9. ASI deployment, Steam options, and in-game verification remain pending.")
-    return f"Reloaded-II {version} installed. Runtime installer exited successfully. Mod loading is not yet verified."
+    report("7–9. ASI deployment, Steam options, and configuration checks remain pending.")
+    return f"Reloaded-II {version} installed. Runtime installer exited successfully. Game configuration is pending."
 
 
 def diagnostics(game):
@@ -162,20 +170,37 @@ def diagnostics(game):
                 if merge_options(option, dll) == option
                 else "PENDING: Steam DLL override needs review (may differ between Steam accounts)."
             )
-    messages.append("UNVERIFIED: Windows runtimes and in-game mod loading require a real Proton/game test.")
+    if guide["stage"] == 6:
+        messages.append("OK: Setup checks passed. Ready to launch.")
+    else:
+        messages.append(
+            "PENDING: Complete the remaining setup steps. Logs show recorded launch and loader errors."
+        )
     return messages
 
 
 def remove_asi(game):
     state = read_json(metadata(game), {})
     if not state.get("asi"):
-        return "No managed ASI integration to remove."
+        from .shortcuts import remove_menu_shortcut
+
+        return "No managed ASI integration to remove.\n" + remove_menu_shortcut(game)
     conflicts = Transaction.rollback(Path(state["asi"]["transaction"]))
     if conflicts:
         raise ValueError("Preserved modified files; remove manually after review: " + ", ".join(conflicts))
+    from .shortcuts import remove_menu_shortcut
+
+    try:
+        shortcut_note = remove_menu_shortcut(game)
+    except (OSError, ValueError) as exc:
+        shortcut_note = "Application shortcut was preserved and needs review: " + str(exc)
     state.pop("asi")
+    state.pop("playtest", None)
     write_json(metadata(game), state)
-    return "Managed ASI files removed. Remove its DLL override in Steam if no longer needed. Reloaded-II, mods and runtimes preserved."
+    return (
+        "Managed ASI files removed. Remove its DLL override in Steam if no longer needed. Reloaded-II, mods and runtimes preserved.\n"
+        + shortcut_note
+    )
 
 
 def setup_guide(game):
@@ -264,12 +289,12 @@ def setup_guide(game):
             "Your current options will be preserved. After saving them in Steam, click Refresh here.",
         }
     return {
-        "stage": 5,
+        "stage": 6,
         "action": "launch_game",
-        "button": "Test game in Steam",
-        "heading": "Install your mods, then test in game",
-        "text": "Open Reloaded-II to install and enable compatible mods, then close it and launch through Steam. "
-        "The loader files and launch options are present; mod loading still needs an in-game test.",
+        "button": "Launch game in Steam",
+        "heading": "Ready",
+        "text": "Open Reloaded-II to install and enable compatible mods. You can launch the game from Reloaded-II, this app, or Steam. "
+        "Configuration checks passed. Mod compatibility still depends on the mods you enable.",
     }
 
 

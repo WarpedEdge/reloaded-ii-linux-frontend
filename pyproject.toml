@@ -5,12 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reloaded-linux-manager"
 version = "0.1.0"
+authors = [{name = "WarpedEdge"}]
 description = "Native Linux setup companion for official Reloaded-II under Steam Proton"
 requires-python = ">=3.11"
 dependencies = ["PySide6>=6.7,<7", "vdf>=3.4,<4", "pefile>=2024.8.26", "libarchive-c>=5.1,<6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9", "pyinstaller>=6.11"]
+
+[project.urls]
+Repository = "https://github.com/WarpedEdge/reloaded-ii-linux-frontend"
+Issues = "https://github.com/WarpedEdge/reloaded-ii-linux-frontend/issues"
 
 [project.scripts]
 reloaded-linux-manager = "reloaded_linux_manager.gui:main"

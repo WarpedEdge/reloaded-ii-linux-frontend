@@ -40,3 +40,6 @@ No service, background daemon, system modification, prefix deletion, source patc
 
 
 Desktop launcher generation follows the [freedesktop Exec quoting rules](https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html) and [string-value escaping rules](https://specifications.freedesktop.org/desktop-entry/latest/value-types.html). Generated launchers invoke executables and quoted arguments directly, without a shell. Reloaded-II launchers use env with STEAM_DIR and the existing Protontricks --appid interface; native-manager launchers target the original AppImage file. Existing shortcut files are protected by the manager's backup journal.
+
+
+Manager self-updates use GitHub's [latest release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release), a fixed repository and asset name, GitHub-provided SHA-256 digests, x86_64 type-2 AppImage validation, same-directory temporary files and atomic replacement with a backup. Restart resets bundled-library variables and uses PYINSTALLER_RESET_ENVIRONMENT in accordance with [PyInstaller subprocess/restart guidance](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html). Public release availability is required; no GitHub credentials are collected.

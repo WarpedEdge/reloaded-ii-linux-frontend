@@ -21,6 +21,19 @@ jobs:
       - run: pip install -e '.[dev]'
       - run: ruff check src tests && ruff format --check src tests
       - run: QT_QPA_PLATFORM=offscreen pytest -q
+      - name: Verify manager release version matches tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          from reloaded_linux_manager import __version__
+          from reloaded_linux_manager.updater import version_tuple
+          with open('pyproject.toml', 'rb') as source:
+              package_version = tomllib.load(source)['project']['version']
+          assert version_tuple(os.environ['RELEASE_TAG']) == version_tuple(__version__) == version_tuple(package_version), 'Set manager and package versions to the release tag before building.'
+          PY
       - name: Download and verify build tool
         env:
           GH_TOKEN: ${{ github.token }}

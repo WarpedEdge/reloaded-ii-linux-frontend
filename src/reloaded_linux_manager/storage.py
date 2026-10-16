@@ -1,5 +1,6 @@
 """Atomic manager settings and reversible, content-checked file transactions."""
 
+import copy
 import hashlib
 import json
 import os
@@ -99,11 +100,14 @@ DEFAULTS = {
     "protontricks_launch": "",
     "prefixes": {},
     "log_level": "INFO",
+    "favorites": [],
+    "check_updates": True,
+    "theme": "dark",
 }
 
 
 def load_settings():
-    return DEFAULTS | read_json(config_home() / "settings.json", {})
+    return copy.deepcopy(DEFAULTS) | read_json(config_home() / "settings.json", {})
 
 
 def save_settings(settings):
