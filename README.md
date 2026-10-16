@@ -1,4 +1,14 @@
-# Reloaded Linux Manager
+# <h1 align="center">Reloaded Linux Manager</h1>
+
+<p align="center">
+  <img src="packaging/reloaded-linux-manager.png" alt="Reloaded Linux Manager icon" width="200">
+</p>
+
+## Disclaimer
+
+This project was created with AI assistance. I made it to make Reloaded-II easier to set up on Linux, with a separate Reloaded-II instance setup for each game. Some games need more setup and troubleshooting than others, and this app can hopefully make it easier for others. If you have any issues with it due to AI controversy or anything, I understand and you do not need to use it. I also mention at the bottom forks are welcome and people can make their own version no problem.
+
+This is an independent frontend. It uses the official Reloaded-II launcher and does not modify or replace it.
 
 A native Linux frontend for setting up and opening the official Windows **Reloaded-II** launcher for Steam games running through Proton.
 
@@ -12,9 +22,14 @@ The manager uses the same setup checks for every game. It does not decide which 
 
 The manager runs natively with Python and PySide6. It does not modify or replace Reloaded-II. Version **0.1** is under development; see [testing and limitations](docs/VALIDATION.md).
 
+## Issues?
+
+Having issues with a specific game? Steam launch options different for it or anything else?
+
+Submit an issue via here or just send me a DM on discord so I can support more. I made this at first for Final Fantasty Tactics: The Ivalice Chronicles (FFT:IC), but it ended up being a setup in general.
+
 ## Requirements
 
-- Linux x86_64 with a graphical desktop.
 - Steam and an installed game configured to use Proton.
 - [Protontricks](https://github.com/Matoking/protontricks#installation), installed natively or as `com.github.Matoking.protontricks` through Flatpak.
 
@@ -22,23 +37,23 @@ Normal use requires no root access or system changes. Native and Flatpak Steam i
 
 ## Run the AppImage
 
-Download `Reloaded-Linux-Manager-x86_64.AppImage` from the project's [releases](https://github.com/WarpedEdge/reloaded-ii-linux-frontend/releases), when available. Make it executable and open it:
+Download `Reloaded-Linux-Manager-x86_64.AppImage` from the project's [releases](https://github.com/WarpedEdge/reloaded-ii-linux-frontend/releases), when available, and double-click it.
 
-```bash
-chmod +x Reloaded-Linux-Manager-x86_64.AppImage
-./Reloaded-Linux-Manager-x86_64.AppImage
-```
+If your file manager asks, allow the file to run as a program in its Properties → Permissions settings, then open it again.
 
-If FUSE is unavailable, run it with `--appimage-extract-and-run`.
+<details>
+<summary>If the AppImage does not open</summary>
+
+</details>
 
 ## Set up a game
 
-1. Choose Proton in the game's Steam Properties → Compatibility. Launch the game through Steam once, then close it. This creates its Windows environment.
+1. Choose Proton in the game's Steam Properties → Compatibility. Launch the game through Steam once, then close it. This creates its prefix.
 2. Open the manager and select the game. Check the detected Steam, game and prefix paths. Use Refresh after changing Steam settings.
 3. Click **Set up Reloaded-II** and review the changes. The manager downloads the official release, checks its SHA-256 hashes and file sizes, and runs the official Windows prerequisite installer through Protontricks.
-4. Click **Open Reloaded-II**. Choose Add Application in its window and select your game's Windows executable. Install and enable compatible mods there, following their instructions.
-5. You may need to launch the game once from inside Reloaded-II so it can download missing mod dependencies. Wait for downloads and popups to finish, then close the game and Reloaded-II.
-6. Click **Deploy ASI Loader** and select the executable you registered. The manager checks its DLL imports and deploys the official loader files. Existing loader conflicts stop deployment for review.
+4. Click **Open Reloaded-II**. Choose Add Application in its window and select your game's executable. Install and enable compatible mods there, following their instructions.
+5. After enabling mods, you may need to launch the game once from inside Reloaded-II so it can download missing mod dependencies. Wait for downloads and popups to finish, then close the game and Reloaded-II. If a launch through Steam reports a missing dependency, reopen Reloaded-II and launch from there to let it check for downloads.
+6. Click **Enable loading through Steam** when it appears as the next setup step, and select the executable you registered. This deploys the ASI loader—the same action as the **Deploy ASI Loader** button. Existing loader conflicts stop deployment for review.
 7. Click **Steam launch options**, review the generated value, then copy and paste it into Steam → game Properties → General → Launch Options. Existing parameters are kept when they can be merged safely. Use **Check Steam settings** to read the saved value.
 8. Launch the game from Reloaded-II, this app, or Steam. Check that your mods work in game. The native manager does not need to stay open.
 
@@ -134,6 +149,8 @@ AppImage bundles Python, Qt and application dependencies, including libarchive. 
 
 Bazzite, SteamOS, Fedora, Ubuntu, Debian, Linux Mint, Arch, EndeavourOS and openSUSE are testing targets, not guaranteed compatible systems. ARM and 32-bit systems are unsupported. Non-Steam prefixes, automatic prefix creation and automatic migration from other managers are unsupported.
 
-## Credits
+## License
 
-Written by **WarpedEdge**. The manager's code is MIT licensed. Reloaded-II and its binaries retain their own licenses and are downloaded from the official project rather than bundled here. This is an independent frontend.
+The manager's code is available under the [MIT License](LICENSE). Forks and modified versions are welcome. Please link back to the [original project](https://github.com/WarpedEdge/reloaded-ii-linux-frontend), and keep the copyright and license notices required by the license.
+
+Reloaded-II and its binaries retain their own licenses and are downloaded from the official project rather than bundled here.
