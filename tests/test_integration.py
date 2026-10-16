@@ -10,12 +10,12 @@ from reloaded_linux_manager.storage import Transaction, write_json
 
 def prepared(tmp_path, monkeypatch):
     library = tmp_path / "library"
-    prefix = library / "steamapps/compatdata/1004640/pfx"
-    directory = library / "steamapps/common/FFT"
+    prefix = library / "steamapps/compatdata/123456/pfx"
+    directory = library / "steamapps/common/Example Game"
     directory.mkdir(parents=True)
-    exe = directory / "FFT_enhanced.exe"
+    exe = directory / "game.exe"
     exe.touch()
-    game = Game("1004640", "FFT", directory, library, tmp_path, prefix, "Proton")
+    game = Game("123456", "Example Game", directory, library, tmp_path, prefix, "Proton")
     loader = game.install / "Loader/X64/Reloaded.Mod.Loader.dll"
     loader.parent.mkdir(parents=True)
     loader.touch()
@@ -37,7 +37,7 @@ def prepared(tmp_path, monkeypatch):
             "ApplicationConfigDirectory": win_install + "/Apps",
         },
     )
-    write_json(game.install / "Apps/fft_enhanced.exe/AppConfig.json", {"AppLocation": "Z:" + str(exe)})
+    write_json(game.install / "Apps/game.exe/AppConfig.json", {"AppLocation": "Z:" + str(exe)})
     (prefix / "dosdevices").mkdir()
     (prefix / "dosdevices/z:").symlink_to("/")
     monkeypatch.setattr(integration, "executable_info", lambda _: (True, "version"))

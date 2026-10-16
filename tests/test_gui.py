@@ -30,9 +30,9 @@ def test_game_selection_shows_one_guided_action(tmp_path, monkeypatch):
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    fft = Game("1004640", "FFT", tmp_path, tmp_path, tmp_path, None, "Proton")
+    game = Game("123456", "Example Game", tmp_path, tmp_path, tmp_path, None, "Proton")
     tool = Game("228980", "Steamworks Common Redistributables", tmp_path, tmp_path, tmp_path, None, "")
-    monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([tool, fft], []))
+    monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([tool, game], []))
     app = QApplication.instance() or QApplication([])
     window = Window()
     for _ in range(20):
@@ -46,7 +46,7 @@ def test_game_selection_shows_one_guided_action(tmp_path, monkeypatch):
     )
     assert "Reinstall Reloaded-II" in menu_labels
     assert window.library.count() == 1
-    assert window.game.appid == "1004640"
+    assert window.game.appid == "123456"
     assert window.primary.text() == "Launch game in Steam"
     assert window.primary.isEnabled()
     assert not window.open_button.isEnabled()
@@ -203,7 +203,7 @@ def test_game_launch_opens_steam_without_dependency_blocking(tmp_path, monkeypat
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    game = Game("1004640", "FFT", tmp_path, tmp_path, tmp_path, None, "Proton")
+    game = Game("123456", "Example Game", tmp_path, tmp_path, tmp_path, None, "Proton")
     monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([game], []))
     app = QApplication.instance() or QApplication([])
     window = Window()
@@ -218,7 +218,7 @@ def test_game_launch_opens_steam_without_dependency_blocking(tmp_path, monkeypat
         lambda url: opened.append(url.toString()) or True,
     )
     window.launch_game()
-    assert opened == ["steam://rungameid/1004640"]
+    assert opened == ["steam://rungameid/123456"]
     window.log_panel.stop()
     window.close()
 
@@ -233,7 +233,9 @@ def test_copy_options_records_handoff_and_menu_order(tmp_path, monkeypatch):
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    game = Game("1004640", "FFT", tmp_path, tmp_path, tmp_path, None, "Proton", ("MANGOHUD=1 %command%",))
+    game = Game(
+        "123456", "Example Game", tmp_path, tmp_path, tmp_path, None, "Proton", ("MANGOHUD=1 %command%",)
+    )
     monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([game], []))
     app = QApplication.instance() or QApplication([])
     window = Window()

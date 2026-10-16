@@ -1,4 +1,5 @@
 import zipfile
+from dataclasses import replace
 
 import pytest
 
@@ -7,15 +8,31 @@ from reloaded_linux_manager.steam import Game
 from reloaded_linux_manager.storage import read_json, write_json
 
 
+def test_registration_guidance_is_generic_for_all_games(tmp_path, monkeypatch):
+    game = prepared(tmp_path, monkeypatch)
+    game.install.mkdir(parents=True)
+    (game.install / "Reloaded-II.exe").touch()
+    original_text = service.setup_guide(game)["text"]
+    assert "Example Game" not in original_text
+    other_game = replace(game, appid="654321", name="Another Game")
+    other_game.install.mkdir(parents=True, exist_ok=True)
+    (other_game.install / "Reloaded-II.exe").touch()
+    text = service.setup_guide(other_game)["text"]
+    assert text == original_text
+    assert "Example Game" not in text
+    assert "your game's .exe" in text
+    assert "launch the game once from inside Reloaded-II" in text
+
+
 def prepared(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     library = tmp_path / "library"
-    prefix = library / "steamapps/compatdata/1004640/pfx"
+    prefix = library / "steamapps/compatdata/123456/pfx"
     (prefix / "drive_c").mkdir(parents=True)
     (prefix / "system.reg").touch()
-    directory = library / "steamapps/common/FFT"
+    directory = library / "steamapps/common/Example Game"
     directory.mkdir(parents=True)
-    game = Game("1004640", "FFT", directory, library, tmp_path / "steam", prefix, "GE-Proton")
+    game = Game("123456", "Example Game", directory, library, tmp_path / "steam", prefix, "GE-Proton")
     archive = tmp_path / "Release.zip"
     with zipfile.ZipFile(archive, "w") as output:
         for name in [
@@ -169,7 +186,7 @@ def test_ready_means_verified_configuration_and_changed_asi_is_failed(tmp_path, 
     write_json(service.metadata(game), {"asi": {"dll": "version", "files": {str(proxy): digest(proxy)}}})
     guide = service.setup_guide(game)
     assert guide["stage"] == 6 and guide["heading"] == "Ready"
-    assert "finish downloading dependencies" in guide["text"]
+    assert "download missing mod dependencies" in guide["text"]
     assert "OK: Setup checks passed. Ready to launch." in service.diagnostics(game)
     proxy.write_bytes(b"changed")
     guide = service.setup_guide(game)

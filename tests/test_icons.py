@@ -66,6 +66,25 @@ def test_x64_executables_and_nested_steam_art_are_discovered(tmp_path, monkeypat
     assert QImage(result).size().width() == 256
 
 
+def test_executable_icon_prefers_game_folder_name(tmp_path, monkeypatch):
+    folder = tmp_path / "Example Game"
+    folder.mkdir()
+    (folder / "Example Game.exe").touch()
+    (folder / "A Launcher.exe").touch()
+    game = Game("123456", "Example Game", folder, tmp_path, tmp_path, None, "")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(icons, "application_icon", lambda _: None)
+    inspected = []
+
+    def embedded_icon(path):
+        inspected.append(path.name)
+        return b"icon fixture"
+
+    monkeypatch.setattr(icons, "embedded_icon", embedded_icon)
+    assert icons.game_icon(game).endswith(".ico")
+    assert inspected == ["Example Game.exe"]
+
+
 def test_shortcut_badge_is_generated_per_game(tmp_path, monkeypatch):
     from PySide6.QtGui import QColor, QImage
 

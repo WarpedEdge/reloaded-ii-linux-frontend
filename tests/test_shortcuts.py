@@ -18,8 +18,8 @@ def test_exec_escaping_without_a_shell():
 
 def test_reloaded_shortcut_uses_correct_prefix_launcher_and_env(tmp_path, monkeypatch):
     library = tmp_path / "Steam Library"
-    prefix = library / "steamapps/compatdata/1004640/pfx"
-    game = Game("1004640", "FFT", tmp_path, library, tmp_path / "steam", prefix, "Proton")
+    prefix = library / "steamapps/compatdata/123456/pfx"
+    game = Game("123456", "Example Game", tmp_path, library, tmp_path / "steam", prefix, "Proton")
     game.install.mkdir(parents=True)
     (game.install / "Reloaded-II.exe").touch()
     monkeypatch.setattr(
@@ -34,7 +34,7 @@ def test_reloaded_shortcut_uses_correct_prefix_launcher_and_env(tmp_path, monkey
     )
     content = shortcuts.reloaded_entry(game, {})
     assert "STEAM_DIR=" in content and str(game.steam) in content
-    assert '"--appid" "1004640"' in content
+    assert '"--appid" "123456"' in content
     assert '"--command=protontricks-launch"' in content
     assert str(game.install / "Reloaded-II.exe") in content
     assert "reloaded-linux-manager" not in content.lower()
@@ -66,10 +66,10 @@ def test_manager_shortcut_keeps_original_appimage_path(tmp_path, monkeypatch):
 def test_application_menu_shortcuts_have_stable_names_and_can_be_removed(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    game = Game("1004640", "FINAL FANTASY: TACTICS / Test", tmp_path, tmp_path, tmp_path, None, "")
+    game = Game("123456", "Example: Game / Test", tmp_path, tmp_path, tmp_path, None, "")
     content = shortcuts.desktop_entry("Reloaded-II", ["/bin/true"])
     shortcuts.install_menu_shortcut(content, game=game)
-    expected = tmp_path / "data/applications/Reloaded-II-FINAL-FANTASY-TACTICS-Test.desktop"
+    expected = tmp_path / "data/applications/Reloaded-II-Example-Game-Test.desktop"
     assert expected.is_file()
     shortcuts.install_menu_shortcut(content, game=game)
     assert len(list(expected.parent.glob("*.desktop"))) == 1

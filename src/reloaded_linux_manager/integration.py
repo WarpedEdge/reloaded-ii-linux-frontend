@@ -24,14 +24,6 @@ DLL32 = (
     "d3d8",
 )
 DLL64 = ("version", "winmm", "wininet", "dsound", "dinput8")
-PROFILES = {
-    "1004640": {
-        "executables": ("FFT_enhanced.exe", "FFT_classic.exe"),
-        "notes": "Register FFT_enhanced.exe and/or FFT_classic.exe in Reloaded-II. "
-        "Install Nenkai's fftivc.utility.modloader and its dependencies through Reloaded-II. "
-        "Current mod loader targets .NET 9; compatibility must be tested on your Proton version.",
-    }
-}
 
 
 def executable_info(path):

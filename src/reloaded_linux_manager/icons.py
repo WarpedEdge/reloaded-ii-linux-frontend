@@ -85,7 +85,7 @@ def game_icon(game):
                 ]
                 if p.suffix.lower() == ".exe"
             ),
-            key=lambda p: ("fft_enhanced" not in p.stem.lower(), p.name),
+            key=lambda p: (p.stem.casefold() != game.directory.name.casefold(), p.name.casefold()),
         )[:3]
         for executable in executables:
             stamp = f"{executable}:{executable.stat().st_mtime_ns}:{executable.stat().st_size}"

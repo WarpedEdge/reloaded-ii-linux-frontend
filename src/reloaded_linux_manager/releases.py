@@ -2,12 +2,18 @@
 
 import hashlib
 import json
+import logging
 import re
 import stat
+import time
 import zipfile
+from datetime import datetime
 from pathlib import Path, PurePosixPath
+from urllib.error import HTTPError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
+
+from .storage import cache_home, read_json, write_json
 
 API = "https://api.github.com/repos/Reloaded-Project/Reloaded-II/releases/"
 
@@ -23,8 +29,61 @@ def request(url):
 
 def release(version="latest"):
     endpoint = "latest" if version == "latest" else "tags/" + quote(version, safe="")
-    with request(API + endpoint) as stream:
-        data = json.load(stream)
+    cached_path = (
+        cache_home() / "release-metadata" / (hashlib.sha256(endpoint.encode()).hexdigest() + ".json")
+    )
+    try:
+        cached = read_json(cached_path, {})
+        fetched_at = float(cached.get("fetched_at", 0))
+        cached_data = cached.get("data")
+        if cached_data is not None:
+            _release_assets(cached_data)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        cached, cached_data = {}, None
+    if cached_data is not None and 0 <= time.time() - fetched_at < 3600:
+        return _release_assets(cached_data)
+    try:
+        with request(API + endpoint) as stream:
+            data = json.load(stream)
+    except HTTPError as exc:
+        if exc.code in (403, 429):
+            if cached_data is not None:
+                logging.getLogger(__name__).warning(
+                    "GitHub HTTP %s; using previously fetched official Reloaded-II release %s. "
+                    "Downloaded files still require SHA-256 and size validation.",
+                    exc.code,
+                    cached_data["tag_name"],
+                )
+                return _release_assets(cached_data)
+            raise RuntimeError(github_error_message(exc)) from exc
+        raise
+    result = _release_assets(data)
+    try:
+        write_json(cached_path, {"fetched_at": time.time(), "data": data})
+    except OSError:
+        logging.getLogger(__name__).warning("Could not cache Reloaded-II release information.")
+    return result
+
+
+def github_error_message(exc):
+    """Explain API throttling without treating every forbidden response as a rate limit."""
+    headers = exc.headers or {}
+    limited = exc.code == 429 or headers.get("X-RateLimit-Remaining") == "0" or headers.get("Retry-After")
+    if not limited:
+        return f"GitHub refused the request (HTTP {exc.code}); access may be restricted or temporarily rate limited. Try again later."
+    retry = "Try again later."
+    try:
+        if headers.get("Retry-After"):
+            retry = f"Try again in {int(headers['Retry-After'])} seconds."
+        elif headers.get("X-RateLimit-Reset"):
+            reset = datetime.fromtimestamp(int(headers["X-RateLimit-Reset"])).astimezone()
+            retry = "Try again after " + reset.strftime("%H:%M:%S %Z") + "."
+    except (ValueError, OverflowError, OSError):
+        pass
+    return "GitHub's API rate limit has been reached. " + retry
+
+
+def _release_assets(data):
     assets = {a["name"]: a for a in data["assets"]}
     if not {"Release.zip", "Setup-Linux.exe"} <= assets.keys():
         raise ValueError("Release does not provide the official portable ZIP and Linux installer.")

@@ -241,7 +241,8 @@ def setup_guide(game):
             "button": "Open Reloaded-II",
             "heading": "Add your game in Reloaded-II",
             "text": "In the Reloaded-II window, choose Add Application and select your game's .exe. "
-            "For FFT, choose FFT_enhanced.exe or FFT_classic.exe. After adding mods, select the game and leave Reloaded-II open for a moment to finish downloading dependencies before closing it.",
+            "After installing and enabling mods, you may need to launch the game once from inside Reloaded-II "
+            "so it can download missing mod dependencies before you launch from this app or Steam.",
         }
     state = read_json(metadata(game), {})
     if not state.get("asi"):
@@ -296,7 +297,8 @@ def setup_guide(game):
             else "Launch options copied. Paste them into Steam → game Properties → General before launching. The saved Steam setting has not been detected yet. "
         )
         + "Open Reloaded-II to install and enable compatible mods. You can launch the game from Reloaded-II, this app, or Steam. "
-        "After adding mods, select this game in Reloaded-II and leave it open for a moment to finish downloading dependencies before closing it. Mod compatibility depends on the mods you enable.",
+        "After installing and enabling mods, you may need to launch the game once from inside Reloaded-II "
+        "so it can download missing mod dependencies. Mod compatibility depends on the mods you enable.",
     }
 
 

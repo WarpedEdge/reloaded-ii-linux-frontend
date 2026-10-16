@@ -30,11 +30,11 @@ def game_setup(tmp_path, monkeypatch):
     )
     write_json(
         game.install / "Apps/game/AppConfig.json",
-        {"AppLocation": r"C:\Game\game.exe", "EnabledMods": ["fft.loader"]},
+        {"AppLocation": r"C:\Game\game.exe", "EnabledMods": ["example.loader"]},
     )
     write_json(
-        game.install / "Mods/fft.loader/ModConfig.json",
-        {"ModId": "fft.loader", "ModDependencies": ["Reloaded.Memory.SigScan.ReloadedII"]},
+        game.install / "Mods/example.loader/ModConfig.json",
+        {"ModId": "example.loader", "ModDependencies": ["Reloaded.Memory.SigScan.ReloadedII"]},
     )
     dll = directory / "version.dll"
     dll.write_bytes(b"loader")
@@ -47,7 +47,7 @@ def test_missing_mod_dependencies_no_longer_flag_setup(tmp_path, monkeypatch):
     guide = service.setup_guide(game)
     assert guide["stage"] == 6 and guide["heading"] == "Ready"
     assert "dependency_issues" not in guide
-    assert "leave it open" in guide["text"]
+    assert "launch the game once from inside Reloaded-II" in guide["text"]
 
 
 def test_copy_advances_setup_without_claiming_steam_was_changed(tmp_path, monkeypatch):

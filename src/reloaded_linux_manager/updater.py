@@ -13,6 +13,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from . import __version__
+from .releases import github_error_message
 from .storage import digest
 
 REPOSITORY = "WarpedEdge/reloaded-ii-linux-frontend"
@@ -54,7 +55,7 @@ def check_update(current=__version__):
                 "status": "unavailable",
                 "message": "No public manager release is available yet (repository or release not publicly accessible).",
             }
-        raise RuntimeError(f"GitHub update check failed (HTTP {exc.code}); try again later.") from exc
+        raise RuntimeError(github_error_message(exc)) from exc
     if data.get("draft") or data.get("prerelease"):
         return {"status": "current", "message": "No newer stable manager release available."}
     version = data.get("tag_name", "")

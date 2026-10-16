@@ -1,18 +1,20 @@
-# Runtime removal design (not implemented)
+# Runtime removal (not implemented)
 
-Deleting a Proton prefix is not necessary to uninstall a Windows runtime. It is a broader operation that can remove game saves, configuration, launchers, other dependencies and this manager's reset backups. The manager does not delete prefixes.
+Reset All keeps Windows runtimes. Deleting a Proton prefix is a much broader action: it can remove saves, settings, launchers, other dependencies and this manager's reset backups. The manager never deletes prefixes.
 
-A future targeted runtime-removal feature should:
+Removing runtimes safely would require records from before the first installation. Existing setups do not have those records, so the manager cannot tell which VC++ or .NET components it added or upgraded.
 
-1. Before the first dependency installation, inventory both x86/x64 installed packages, exact versions and uninstall identities in the selected prefix. Store a filesystem/registry baseline or full recoverable snapshot, with an explicit storage estimate. A version list alone cannot reverse upgrades of existing components.
-2. Run the official installer and retain its logs. Compare before/after state and distinguish newly added components from pre-existing or upgraded components. Do not infer ownership from display names or timestamps alone.
-3. Present a specific removal plan. Components that were already present or have uncertain attribution stay installed. Even newly added packages can later become game dependencies; additions are not proof of exclusive Reloaded-II ownership.
-4. Use validated official Windows uninstall mechanisms within the same existing Proton environment, without a shell, Linux root access or host package-manager changes. Never delete runtime DLL directories manually or execute arbitrary uninstall strings from registry data. Microsoft documents the .NET Uninstall Tool's supported install methods and limitations; operation through Proton still needs testing. VC++ needs its own supported package-specific uninstall route.
-5. Verify exit codes and resulting inventories, retain failure diagnostics, and support recovery. Restoring an entire old prefix snapshot can also rewind later saves/settings; it must be a separate, explicit operation with current user data backed up.
+## What a future implementation needs
 
-Existing manager installations do not have this baseline, so Reset All currently resets Reloaded-II files/configuration and ASI deployment while retaining Windows runtimes. Current backups cover the manager's own changes, not a pre-install prefix snapshot. A prefix rebuild is a last-resort troubleshooting option, not the normal reset operation; backing up/renaming it is preferable to deleting the only copy, and Steam Cloud must not be assumed to cover every save.
+1. Record installed x86 and x64 packages, exact versions and uninstall identifiers before setup. Keep a recoverable file and registry backup, with an estimate of its disk space. A version list alone cannot undo an upgrade.
+2. Run the official installer and keep its logs. Compare the result with the earlier records. Do not decide which components were added from display names or timestamps alone.
+3. Show the user exactly what would be removed. Keep components that were already present or whose origin is unclear. A component installed during setup might also be needed by the game later.
+4. Use the official Windows uninstall method in the same Proton environment. Do not delete runtime DLL folders or run arbitrary uninstall commands read from the registry. The .NET Uninstall Tool has limits on supported installations; VC++ needs its own uninstall method. Both need testing through Proton.
+5. Check the result, keep failure logs and allow recovery. Restoring a whole prefix backup can rewind newer saves and settings, so that must be a separate action with current user data backed up first.
 
-References:
+Current file backups only cover changes made by the manager. They cannot restore the prefix to its state before the Windows runtime installer ran. Rebuilding a prefix should remain a last-resort troubleshooting action. Keep a recoverable copy first; Steam Cloud may not contain every save.
+
+## References
 
 - [Microsoft .NET Uninstall Tool limitations](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/uninstall-tool-overview)
 - [Valve Proton FAQ: prefixes and saved games](https://github.com/ValveSoftware/Proton/wiki/Proton-FAQ)

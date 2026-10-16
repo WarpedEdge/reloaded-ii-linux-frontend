@@ -839,8 +839,11 @@ class Window(QMainWindow):
             QMessageBox.information(
                 self,
                 "Let Reloaded-II finish its downloads",
-                "After adding mods, select your game in Reloaded-II and leave it open for a moment. "
-                "It downloads required dependencies automatically. Wait for downloads and popups to finish before closing Reloaded-II and launching the game.",
+                "Add your game in Reloaded-II, then install and enable your compatible mods. "
+                "Wait for downloads and popups to finish.\n\n"
+                "NOTE: You may need to launch the game once from inside Reloaded-II after enabling mods that may have dependencies. "
+                "Once launched once, then launching from steam should work once enabled.\n\n"
+                "After that, you can close Reloaded-II and launch the game from this app or Steam.",
             )
             state["dependency_reminder_shown"] = True
             write_json(service.metadata(game), state)
@@ -850,7 +853,9 @@ class Window(QMainWindow):
             if not executable.is_file():
                 raise ValueError("Use Setup Reloaded-II first.")
             report(
-                "Reloaded-II is running. Select your game after adding mods, then leave Reloaded-II open for a moment so it can download all required dependencies. Wait for downloads and popups to finish before closing it."
+                "Reloaded-II is running. After installing and enabling mods, you may need to launch the game once "
+                "from inside Reloaded-II so it can download missing mod dependencies. Wait for downloads and popups "
+                "to finish. After that, you can close Reloaded-II and launch the game from this app or Steam."
             )
             proton.run(
                 game,
