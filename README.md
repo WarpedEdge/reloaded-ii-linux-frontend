@@ -7,12 +7,11 @@
 ## Disclaimer
 
 This project was created with AI assistance. I made it to make Reloaded-II easier to set up on Linux, with a separate Reloaded-II instance setup for each game. Some games need more setup and troubleshooting than others, and this app can hopefully make it easier for others. If you have any issues with it due to AI controversy or anything, I understand and you do not need to use it. I also mention at the bottom forks are welcome and people can make their own version no problem.
+## What is this?
 
-This is an independent frontend. It uses the official Reloaded-II launcher and does not modify or replace it.
+This is a native Linux frontend specifically using the official **Reloaded-II** launcher and does not modify or replace it, letting you launch your steam games through Proton.
 
-A native Linux frontend for setting up and opening the official Windows **Reloaded-II** launcher for Steam games running through Proton.
-
-- Find installed Steam games, including games on external drives.
+- Finds installed Steam games, including games on external drives.
 - Install official Reloaded-II releases in each game's existing Proton prefix.
 - Open Reloaded-II in the selected game's Windows environment.
 - Deploy its ASI loader and generate Steam launch options.
