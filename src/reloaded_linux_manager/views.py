@@ -36,12 +36,6 @@ def log_files(game=None):
     return files
 
 
-def logs(game=None):
-    files = log_files(game)
-    sections = [f"=== {p.name} ===\n{p}\n\n{tail(p)}" for p in files if p.is_file()]
-    return "\n\n".join(sections) or "No log files yet. Actions performed in this manager will appear here."
-
-
 def setup_details(game):
     state = read_json(service.metadata(game), {})
     registry = read_json(shortcuts.registry_path(), {})

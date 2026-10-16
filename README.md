@@ -1,4 +1,4 @@
-# <h1 align="center">Reloaded Linux Manager</h1>
+<h1 align="center">Reloaded Linux Manager</h1>
 
 <p align="center">
   <img src="packaging/reloaded-linux-manager.png" alt="Reloaded Linux Manager icon" width="200">
@@ -25,7 +25,7 @@ The manager runs natively with Python and PySide6. It does not modify or replace
 
 Having issues with a specific game? Steam launch options different for it or anything else?
 
-Submit an issue via here or just send me a DM on discord so I can support more. I made this at first for Final Fantasty Tactics: The Ivalice Chronicles (FFT:IC), but it ended up being a setup in general.
+Submit an issue via [here](https://github.com/WarpedEdge/reloaded-ii-linux-frontend/issues) or just send me a DM on discord `@WarpedEdge` so I can support more. I made this at first for Final Fantasty Tactics: The Ivalice Chronicles (FFT:IC), but it ended up being a setup in general.
 
 ## Requirements
 
@@ -39,11 +39,6 @@ Normal use requires no root access or system changes. Native and Flatpak Steam i
 Download `Reloaded-Linux-Manager-x86_64.AppImage` from the project's [releases](https://github.com/WarpedEdge/reloaded-ii-linux-frontend/releases), when available, and double-click it.
 
 If your file manager asks, allow the file to run as a program in its Properties → Permissions settings, then open it again.
-
-<details>
-<summary>If the AppImage does not open</summary>
-
-</details>
 
 ## Set up a game
 
@@ -133,6 +128,18 @@ Run the checks:
 Tests use temporary libraries and prefixes. They do not launch real games or install Windows runtimes. See [source research](docs/RESEARCH.md) for the upstream interfaces used by the manager.
 
 ## Build an AppImage
+
+### Build with GitHub Actions
+
+You can build your own AppImage on GitHub without installing local build tools:
+
+1. Fork this repository to your GitHub account.
+2. Open **Actions** in your fork. Enable workflows if GitHub asks.
+3. Select **Linux validation and AppImage**, then click **Run workflow** and choose your branch.
+4. Once the run succeeds, open it and download **Reloaded-Linux-Manager-x86_64** from **Artifacts**.
+5. Extract the downloaded ZIP to get the AppImage and `SHA256SUMS` (optional). Allow the AppImage to run as a program if needed, then double-click it.
+
+### Build locally
 
 Install the development dependencies above. Obtain and verify [appimagetool](https://github.com/AppImage/appimagetool), then run:
 

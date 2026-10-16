@@ -1,12 +1,10 @@
 from reloaded_linux_manager import views
 
 
-def test_log_tail_is_bounded_and_shown_as_text(tmp_path, monkeypatch):
-    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
-    path = tmp_path / "reloaded-linux-manager/manager.log"
-    path.parent.mkdir()
+def test_log_tail_is_bounded_and_shown_as_text(tmp_path):
+    path = tmp_path / "manager.log"
     path.write_text("prefix" + "a" * 200000 + "\nlast error")
-    text = views.logs()
+    text = views.tail(path)
     assert "[Showing the end" in text and text.endswith("last error")
     assert "prefix" not in text and len(text) < 140000
 
