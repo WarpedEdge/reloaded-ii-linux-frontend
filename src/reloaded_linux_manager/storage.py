@@ -107,10 +107,14 @@ DEFAULTS = {
 
 
 def load_settings():
-    return copy.deepcopy(DEFAULTS) | read_json(config_home() / "settings.json", {})
+    settings = copy.deepcopy(DEFAULTS) | read_json(config_home() / "settings.json", {})
+    settings.pop("controller_navigation", None)
+    return settings
 
 
 def save_settings(settings):
+    settings = settings.copy()
+    settings.pop("controller_navigation", None)
     path = config_home() / "settings.json"
     if path.exists():
         shutil.copy2(path, path.with_suffix(".json.bak"))

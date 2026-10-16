@@ -57,6 +57,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QTabWidget,
@@ -65,7 +66,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import __version__, icons, proton, reset, service, shortcuts, steam, themes, updater, views
+from . import (
+    __version__,
+    icons,
+    proton,
+    reset,
+    service,
+    shortcuts,
+    steam,
+    themes,
+    updater,
+    views,
+)
 from .integration import deploy, extract_asi, merge_options
 from .log_panel import LogPanel
 from .storage import load_settings, read_json, save_settings, state_home, write_json
@@ -85,13 +97,20 @@ def step_markup(guide, failure=None):
     failure = guide.get("failed_step", failure)
     rows = []
     for index, label in enumerate(STEP_LABELS):
+        if index == 4 and guide.get("options_status") == "copied":
+            label = "Launch options copied"
+        if index == 5 and guide.get("options_status") == "copied":
+            label = "Ready after pasting into Steam"
         if index == failure:
-            color, mark = themes.colors()["error"], "✗"
+            color, mark = themes.colors()["progress_error"], "✗"
         elif 0 <= index < stage:
-            color, mark = themes.colors()["success"], "✓"
+            color, mark = themes.colors()["progress_success"], "✓"
         else:
-            color, mark = themes.colors()["pending"], "→" if index == stage else "•"
-        rows.append(f'<span style="color:{color}">{mark} &nbsp;{html.escape(label)}</span>')
+            color, mark = themes.colors()["progress_pending"], "→" if index == stage else "•"
+        rows.append(
+            f'<span style="color:{color}; font-size:13px; font-weight:600;">'
+            f'<span style="font-size:16px; font-weight:700;">{mark}</span> &nbsp;{html.escape(label)}</span>'
+        )
     return "<br/>".join(rows)
 
 
@@ -141,7 +160,7 @@ class LogHighlighter(QSyntaxHighlighter):
     def highlightBlock(self, text):
         color = None
         if re.search(
-            r"\b(error|errors|exception|failed|failure|fatal)\b|:err:", text, re.I
+            r"\b(error|errors|exception|fail|failed|failure|fatal)\b|:err:", text, re.I
         ) and not re.search(r"\b(no|0) errors?\b", text, re.I):
             color = themes.colors()["error"]
         elif re.search(r"\b(warning|warn|pending|unverified|not tested)\b", text, re.I):
@@ -281,14 +300,19 @@ class SettingsDialog(QDialog):
             button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
             button.setCheckable(True)
             button.setChecked(key == selected)
-            button.setMinimumSize(135, 115)
+            button.setFixedSize(164, 124)
+            button.setToolTip(palette.get("description", palette["name"]))
             button.setProperty("themeKey", key)
             button.clicked.connect(lambda _=False, name=key: parent.apply_theme(name))
             self.theme_group.addButton(button)
             self.theme_buttons[key] = button
-            grid.addWidget(button, index // 3, index % 3)
-        appearance_layout.addLayout(grid)
-        appearance_layout.addStretch()
+            grid.addWidget(button, index // 3, index % 3, Qt.AlignHCenter)
+        cards = QWidget()
+        cards.setLayout(grid)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(cards)
+        appearance_layout.addWidget(scroll, 1)
         self.tabs.addTab(appearance, "Appearance")
         general = QWidget()
         general_layout = QVBoxLayout(general)
@@ -388,13 +412,16 @@ class Window(QMainWindow):
         self.failures = {}
         self.pending_game_key = None
         self.setWindowTitle("Reloaded Linux Manager")
-        self.resize(1240, 840)
+        available = QApplication.primaryScreen().availableGeometry()
+        self.resize(min(1240, available.width() - 20), min(840, available.height() - 40))
         themes.apply(self.settings.get("theme", "dark"))
         root = QWidget()
+        root.setObjectName("managerContent")
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
         topbar = QHBoxLayout()
         heading = QLabel("Reloaded Linux Manager")
+        heading.setObjectName("appHeading")
         heading.setStyleSheet("font-size: 23px; font-weight: 600; padding: 8px")
         topbar.addWidget(heading)
         topbar.addStretch()
@@ -435,7 +462,9 @@ class Window(QMainWindow):
         self.library.setContextMenuPolicy(Qt.CustomContextMenu)
         self.library.customContextMenuRequested.connect(self.game_context_menu)
         library_layout.addWidget(self.library)
-        library_layout.addWidget(QLabel("Right-click a game to favorite it"))
+        library_hint = QLabel("Right-click a game to favorite it")
+        library_hint.setObjectName("libraryHint")
+        library_layout.addWidget(library_hint)
         splitter.addWidget(sidebar)
         right = QWidget()
         panel = QVBoxLayout(right)
@@ -464,15 +493,20 @@ class Window(QMainWindow):
         progress_layout = QVBoxLayout(progress_box)
         self.steps = QLabel(step_markup({}))
         self.steps.setTextFormat(Qt.RichText)
-        self.steps.setStyleSheet("line-height: 1.5; font-size: 12px")
+        self.steps.setStyleSheet("line-height: 1.6; font-size: 13px")
         progress_layout.addWidget(self.steps)
         header.addWidget(progress_box, 1, Qt.AlignTop)
-        panel.addLayout(header)
+        summary_panel = QWidget()
+        summary_panel.setObjectName("gameSummary")
+        summary_panel.setLayout(header)
+        panel.addWidget(summary_panel)
         self.next_heading = QLabel("Choose a game to get started")
         self.next_heading.setWordWrap(True)
+        self.next_heading.setObjectName("stageHeading")
         self.next_heading.setStyleSheet("font-size: 19px; font-weight: 600; margin-top: 20px")
         panel.addWidget(self.next_heading)
         self.next_text = QLabel("Select a game from your library on the left.")
+        self.next_text.setObjectName("stageDescription")
         self.next_text.setWordWrap(True)
         self.next_text.setTextFormat(Qt.PlainText)
         panel.addWidget(self.next_text)
@@ -503,26 +537,26 @@ class Window(QMainWindow):
         self.more_menu.setToolTipsVisible(True)
         for label, action, tooltip in [
             (
-                "Reinstall Reloaded-II…",
-                self.setup,
-                "Download the selected official release and reinstall its program files and prerequisites. Keeps mods, profiles, registration and Steam loading. This may also update Reloaded-II.",
-            ),
-            (
-                "Select existing prefix",
+                "Select Existing Prefix",
                 self.select_prefix,
-                "Locate this game's existing Proton Windows environment when automatic detection fails. Does not create or reset it.",
+                "Choose an existing prefix that is not what was automatically detected.",
             ),
             (
-                "Disconnect Steam mod loading…",
+                "Reinstall Reloaded-II",
+                self.reinstall,
+                "Reinstalls the latest Reloaded-II. Does not touch mods, profiles or game settings.",
+            ),
+            (
+                "Reset ASI Deployment",
                 self.remove,
-                "Restore the game files changed by ASI deployment and remove its application shortcut. Keeps Reloaded-II and mods. Steam launch options need manual review.",
+                "Resets ASI deployment. Does not affect mods or Reloaded-II. Review the related Steam launch option afterward.",
             ),
         ]:
             item = self.more_menu.addAction(label, action)
             item.setToolTip(tooltip)
-        self.reset_action = self.more_menu.addAction("Reset all Reloaded-II setup…", self.reset_all)
+        self.reset_action = self.more_menu.addAction("Reset All", self.reset_all)
         self.reset_action.setToolTip(
-            "Back up and remove this game's Reloaded-II installation, mods, settings, registration, ASI files and game shortcut. Keeps the game, saves, Proton prefix and Windows runtimes."
+            "Restarts Reloaded-II setup from the beginning. Mods/settings are backed up. Existing Windows runtimes are kept."
         )
         self.restore_action = self.more_menu.addAction("Restore last full reset…", self.restore_reset)
         self.restore_action.setToolTip(
@@ -775,7 +809,10 @@ class Window(QMainWindow):
         if self.guide and not self.busy:
             getattr(self, self.guide["action"])()
 
-    def setup(self):
+    def reinstall(self):
+        self.setup(latest=True)
+
+    def setup(self, latest=False):
         game = self.game
         if not game:
             return
@@ -786,19 +823,34 @@ class Window(QMainWindow):
             "Close the game and Reloaded-II before continuing. Continue?"
         )
         if QMessageBox.question(self, "Install / repair / update", text) == QMessageBox.Yes:
-            self.work(lambda report: service.install(game, self.settings, report), failure_step=1)
+            self.work(
+                lambda report: service.install(
+                    game, self.settings | ({"release": "latest"} if latest else {}), report
+                ),
+                failure_step=1,
+            )
 
     def open_reloaded(self):
         game = self.game
         if not game:
             return
+        state = read_json(service.metadata(game), {})
+        if state.get("installed") and not state.get("dependency_reminder_shown"):
+            QMessageBox.information(
+                self,
+                "Let Reloaded-II finish its downloads",
+                "After adding mods, select your game in Reloaded-II and leave it open for a moment. "
+                "It downloads required dependencies automatically. Wait for downloads and popups to finish before closing Reloaded-II and launching the game.",
+            )
+            state["dependency_reminder_shown"] = True
+            write_json(service.metadata(game), state)
 
         def launch(report):
             executable = game.install / "Reloaded-II.exe"
             if not executable.is_file():
                 raise ValueError("Use Setup Reloaded-II first.")
             report(
-                "Reloaded-II is running. Add your game using its executable path, manage mods, then close it to continue here."
+                "Reloaded-II is running. Select your game after adding mods, then leave Reloaded-II open for a moment so it can download all required dependencies. Wait for downloads and popups to finish before closing it."
             )
             proton.run(
                 game,
@@ -845,7 +897,7 @@ class Window(QMainWindow):
             state = read_json(service.metadata(game), {})
             if state.get("asi"):
                 raise ValueError(
-                    "Integration already managed. Use Check Setup or Remove Integration before redeploying."
+                    "ASI deployment already exists. Use More actions → Reset ASI Deployment before redeploying."
                 )
             state["asi"] = deploy(game, Path(filename), service.backups(game))
             write_json(service.metadata(game), state)
@@ -871,19 +923,54 @@ class Window(QMainWindow):
         dialog.setWindowTitle("Steam launch options")
         dialog.resize(760, 350)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(
-            QLabel(
-                "Paste current launch options from Steam Properties → General.\n"
-                "Detected values can belong to different Steam accounts. Review before copying."
-            )
+        instructions = QLabel(
+            "1. Copy the generated options below.\n"
+            "2. In Steam, right-click the game → Properties → General → Launch Options, then paste.\n"
+            "3. Use Check Steam settings below to detect the saved value. Steam may take a moment to write it.\n"
+            "These options enable the deployed ASI DLL. The app never edits Steam settings directly."
         )
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+        status = QLabel()
+        status.setWordWrap(True)
+        layout.addWidget(status)
+        accounts = QComboBox()
+        layout.addWidget(accounts)
         current = QLineEdit(game.launch_options[0] if len(game.launch_options) == 1 else "")
+        current.setPlaceholderText("Existing launch options from Steam (preserved when generating)")
         result = QPlainTextEdit()
         result.setReadOnly(True)
         layout.addWidget(current)
         layout.addWidget(result)
-        copy = QPushButton("Copy generated options")
-        layout.addWidget(copy)
+        row = QHBoxLayout()
+        copy = QPushButton("Copy options — then paste into Steam")
+        recheck = QPushButton("Check Steam settings")
+        row.addWidget(copy)
+        row.addWidget(recheck)
+        layout.addLayout(row)
+        notice = QLabel()
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+
+        def show_detected(values):
+            accounts.blockSignals(True)
+            accounts.clear()
+            accounts.addItem("Choose a detected Steam value…", None)
+            for index, value in enumerate(values):
+                accounts.addItem(f"Saved Steam value {index + 1}: {value}", value)
+            accounts.setVisible(len(values) > 1)
+            accounts.blockSignals(False)
+            try:
+                correct = bool(values) and all(merge_options(value, dll) == value for value in values)
+            except ValueError:
+                correct = False
+            status.setText(
+                "Detected in Steam: the required DLL override is already present."
+                if correct
+                else "Steam settings detected; the DLL override is missing or differs between saved accounts. Choose/review the current options before copying."
+                if values
+                else "No saved launch options detected. Copy and paste below; Steam may not have saved recent changes yet."
+            )
 
         def update():
             try:
@@ -893,8 +980,42 @@ class Window(QMainWindow):
                 result.setPlainText(str(exc))
                 copy.setEnabled(False)
 
+        def copied():
+            QApplication.clipboard().setText(result.toPlainText())
+            state = read_json(service.metadata(game), {})
+            state["launch_options_copied"] = {"dll": dll, "options": result.toPlainText()}
+            write_json(service.metadata(game), state)
+            notice.setText(
+                "Copied. Paste into Steam → Properties → General → Launch Options. Setup can now continue; copying alone does not change Steam."
+            )
+            self.details()
+
+        def checked(data):
+            games, warnings = data
+            updated = next((g for g in games if g.key == game.key), None)
+            if updated:
+                self.games = games
+                self.filter_games()
+                show_detected(updated.launch_options)
+                if len(updated.launch_options) == 1 and not current.isModified():
+                    current.setText(updated.launch_options[0])
+            else:
+                status.setText("Could not find this game while rereading Steam settings.")
+            for warning in warnings:
+                self.message(warning)
+            recheck.setEnabled(True)
+
+        def check_settings():
+            status.setText("Reading Steam’s saved launch options…")
+            self.work(lambda _: steam.discover(self.settings), done=checked)
+
+        accounts.currentIndexChanged.connect(
+            lambda _: current.setText(accounts.currentData()) if accounts.currentData() is not None else None
+        )
         current.textChanged.connect(update)
-        copy.clicked.connect(lambda: QApplication.clipboard().setText(result.toPlainText()))
+        copy.clicked.connect(copied)
+        recheck.clicked.connect(check_settings)
+        show_detected(game.launch_options)
         update()
         dialog.exec()
 
@@ -1038,8 +1159,8 @@ class Window(QMainWindow):
             game
             and QMessageBox.question(
                 self,
-                "Disconnect Steam mod loading",
-                "Remove this manager’s Steam mod-loading files and game application shortcut? Reloaded-II, mods, saves and the Windows environment will be kept. You will need to remove the related DLL override from Steam launch options yourself.",
+                "Reset ASI Deployment",
+                "Reset this manager’s ASI deployment? Reloaded-II, mods, the application shortcut, saves and the Windows environment will be kept. You will need to remove the related DLL override from Steam launch options yourself.",
             )
             == QMessageBox.Yes
         ):
@@ -1051,7 +1172,7 @@ class Window(QMainWindow):
             return
         answer = QMessageBox.question(
             self,
-            "Reset all Reloaded-II setup",
+            "Reset All",
             "Close the game and Reloaded-II first.\n\n"
             "This backs up and removes this game's managed Reloaded-II installation, ALL its mods, "
             "settings and registrations, ASI integration and game application shortcut. "

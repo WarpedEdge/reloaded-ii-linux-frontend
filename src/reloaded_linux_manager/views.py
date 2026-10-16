@@ -108,9 +108,11 @@ def open_file_ids():
     opened = set()
     try:
         for process in Path("/proc").iterdir():
-            if not process.name.isdigit() or process.stat().st_uid != os.getuid():
+            if not process.name.isdigit():
                 continue
             try:
+                if process.stat().st_uid != os.getuid():
+                    continue
                 for fd in (process / "fd").iterdir():
                     try:
                         stat = fd.stat()

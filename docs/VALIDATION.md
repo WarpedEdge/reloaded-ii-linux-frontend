@@ -34,7 +34,7 @@ A successful unit test or file hash does not verify that Windows mods execute. T
 
 ## Guided interface update
 
-Game selection now runs a read-only setup inspection in a worker and shows one next action. Missing prefixes, fresh installs, registration, loader deployment, Steam options and existing foreign integrations have distinct guidance. Registration is not marked complete merely because the launcher created its own configuration. Maintenance tools and technical details are collapsed, Steam support packages are hidden from the picker, and an explicit high-contrast palette avoids unreadable inherited desktop colors. Added tests cover next-action states, existing setup protection, tool filtering and collapsed GUI defaults. The FFT existing-integration view was visually checked with an offscreen screenshot; live desktop/controller interaction remains unverified.
+Game selection now runs a read-only setup inspection in a worker and shows one next action. Missing prefixes, fresh installs, registration, loader deployment, Steam options and existing foreign integrations have distinct guidance. Registration is not marked complete merely because the launcher created its own configuration. Maintenance tools and technical details are collapsed, Steam support packages are hidden from the picker, and an explicit high-contrast palette avoids unreadable inherited desktop colors. Added tests cover next-action states, existing setup protection, tool filtering and collapsed GUI defaults. The FFT existing-integration view was visually checked with an offscreen screenshot; live desktop interaction remains unverified.
 
 ## Layout, manual picker and desktop shortcuts
 
@@ -65,7 +65,7 @@ Setup now turns green automatically when configuration checks pass. Manual playt
 
 Additional icon tests cover x64 executables, Steam's nested hash-named artwork folders and the bottom-right game badge on Reloaded-II shortcut icons. Live read-only lookup resolves FFXII and Lepton artwork. Log-panel tests cover separate sources, marking displayed content read and highlighting new content. The toolbar version is a non-clickable bordered label and About displays 0.1.
 
-All 73 automated tests pass. Game/mod execution and cross-distribution desktop behavior still require real-system testing.
+All 79 automated tests pass. Game/mod execution and cross-distribution desktop behavior still require real-system testing.
 
 Library icons now use the same largest artwork frame as shortcut badges. A multi-frame ICO regression test verifies that small alternate artwork cannot replace the selected image.
 
@@ -78,3 +78,11 @@ Shortcut controls now toggle Add/Remove using tracked file existence. A GUI test
 Tabbed settings and five built-in themes were inspected in dark/light offscreen screenshots. Tests cover live preview, Cancel rollback, saved-theme restoration, unknown-theme fallback, preservation of unrelated settings and contrast of primary text/status colors across all palettes. All themes share token-based widget styling. Desktop-specific rendering and Steam Deck sizing still need real-device checks.
 
 Reinstall/disconnect labels now explain their actual scopes through tooltips. Full-reset tests verify backing up mods/configuration, restoring overwritten original game DLLs, preserving saves/prefix/manager shortcut, successful restoration, refusing external configs and changed loaders, avoiding overwrite of a new setup, and rolling back a simulated mid-reset move failure. No live game was reset. Shutdown now stops log polling and waits for outstanding workers before Qt teardown; the packaged smoke test must finish without deleted-signal errors.
+
+Read-only dependency checks now prevent Ready and manager launch requests when required mods are absent. Tests cover the observed SigScan failure, becoming Ready when it appears, transitive libraries, cycles, disabled/optional dependencies, unreadable metadata and Steam launch preflight. The themes expand to 15 with a scrollable selector, including Cyberpunk and Ivalice (FFT). Contrast checks pass across all palettes; offscreen previews were inspected. End-to-end fresh-reset dependency downloading still requires user testing through the real Reloaded-II GUI.
+
+Theme refinement was informed by read-only inspection of the local Amethyst theme palette and Qt component roles. This project implements its own styles. Equal-size cards (including Breeze), Cyberpunk primary/disabled colors and FFT menu styling have regression coverage. Progress/status contrast is checked across all 15 palettes. Updated Ivalice, Cyberpunk, Pip-Boy and card-grid offscreen screenshots were inspected. Ivalice uses menu colors and raised borders, with no stone backdrop or copied game assets. Real desktop/Deck rendering remains user-tested.
+
+Dependency checklist/preflight was removed at user request, superseding the earlier dependency-check validation section. Tests now verify unblocked launch, download guidance, copied-vs-detected Steam options and the explicit copy handoff. Menu order and tooltips are simplified. Ivalice uses warmer/darker taupe panels with status contrast still checked. Runtime removal is not implemented: existing installs have no trustworthy pre-runtime baseline; Reset All explicitly retains shared prerequisites.
+
+Native controller implementation, keyboard overlay, settings/hints and SDL dependencies were removed at user request. Existing mouse/keyboard navigation is preserved. Obsolete controller preferences are discarded when settings are loaded/saved.

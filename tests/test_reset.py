@@ -73,6 +73,7 @@ def test_full_reset_and_restore_keeps_game_prefix_and_mod_backup(tmp_path, monke
     assert shortcuts.menu_shortcut_exists(game)
     # The original disconnect operation remains reversible after restoration.
     service.remove_asi(game)
+    assert shortcuts.menu_shortcut_exists(game)
     assert dll.read_bytes() == b"original game DLL"
 
 

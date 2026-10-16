@@ -44,7 +44,7 @@ def test_game_selection_shows_one_guided_action(tmp_path, monkeypatch):
     assert not menu_labels.intersection(
         {"View logs", "Setup details", "Check setup", "Launch game", "Update Reloaded-II"}
     )
-    assert "Reinstall Reloaded-II…" in menu_labels
+    assert "Reinstall Reloaded-II" in menu_labels
     assert window.library.count() == 1
     assert window.game.appid == "1004640"
     assert window.primary.text() == "Launch game in Steam"
@@ -79,9 +79,9 @@ def test_progress_uses_done_failed_and_pending_colors():
     from reloaded_linux_manager.gui import step_markup
 
     markup = step_markup({"stage": 3, "failed_step": 3})
-    assert "#77d994" in markup and "✓" in markup
-    assert "#ff8994" in markup and "✗" in markup
-    assert "#83b8ff" in markup
+    assert "#55f995" in markup and "✓" in markup
+    assert "#ff7587" in markup and "✗" in markup
+    assert "#64caff" in markup
 
 
 def test_file_picker_has_editable_path_and_readable_navigation(tmp_path):
@@ -192,5 +192,78 @@ def test_shortcut_buttons_toggle_and_refresh_after_external_removal(tmp_path, mo
     window.details()
     drain()
     assert window.manager_shortcut.text() == "Add manager to applications"
+    window.log_panel.stop()
+    window.close()
+
+
+def test_game_launch_opens_steam_without_dependency_blocking(tmp_path, monkeypatch):
+    from PySide6.QtCore import QThreadPool
+
+    from reloaded_linux_manager.steam import Game
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    game = Game("1004640", "FFT", tmp_path, tmp_path, tmp_path, None, "Proton")
+    monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([game], []))
+    app = QApplication.instance() or QApplication([])
+    window = Window()
+    for _ in range(20):
+        QThreadPool.globalInstance().waitForDone(5000)
+        app.processEvents()
+        if not window.workers:
+            break
+    opened = []
+    monkeypatch.setattr(
+        "reloaded_linux_manager.gui.QDesktopServices.openUrl",
+        lambda url: opened.append(url.toString()) or True,
+    )
+    window.launch_game()
+    assert opened == ["steam://rungameid/1004640"]
+    window.log_panel.stop()
+    window.close()
+
+
+def test_copy_options_records_handoff_and_menu_order(tmp_path, monkeypatch):
+    from PySide6.QtCore import QThreadPool, QTimer
+    from PySide6.QtWidgets import QDialog, QPushButton
+
+    from reloaded_linux_manager import service
+    from reloaded_linux_manager.steam import Game
+    from reloaded_linux_manager.storage import read_json, write_json
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    game = Game("1004640", "FFT", tmp_path, tmp_path, tmp_path, None, "Proton", ("MANGOHUD=1 %command%",))
+    monkeypatch.setattr("reloaded_linux_manager.steam.discover", lambda _: ([game], []))
+    app = QApplication.instance() or QApplication([])
+    window = Window()
+    for _ in range(20):
+        QThreadPool.globalInstance().waitForDone(5000)
+        app.processEvents()
+        if not window.workers:
+            break
+    write_json(service.metadata(game), {"asi": {"dll": "version"}})
+    assert [action.text() for action in window.more_menu.actions()] == [
+        "Select Existing Prefix",
+        "Reinstall Reloaded-II",
+        "Reset ASI Deployment",
+        "Reset All",
+        "Restore last full reset…",
+    ]
+
+    def copy_and_close():
+        dialog = window.findChildren(QDialog)[-1]
+        button = next(b for b in dialog.findChildren(QPushButton) if b.text().startswith("Copy options"))
+        button.click()
+        dialog.accept()
+
+    QTimer.singleShot(0, copy_and_close)
+    window.options()
+    record = read_json(service.metadata(game))["launch_options_copied"]
+    assert record["dll"] == "version"
+    assert "MANGOHUD=1" in record["options"]
+    assert QApplication.clipboard().text() == record["options"]
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
     window.log_panel.stop()
     window.close()

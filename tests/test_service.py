@@ -169,7 +169,7 @@ def test_ready_means_verified_configuration_and_changed_asi_is_failed(tmp_path, 
     write_json(service.metadata(game), {"asi": {"dll": "version", "files": {str(proxy): digest(proxy)}}})
     guide = service.setup_guide(game)
     assert guide["stage"] == 6 and guide["heading"] == "Ready"
-    assert "Mod compatibility" in guide["text"]
+    assert "finish downloading dependencies" in guide["text"]
     assert "OK: Setup checks passed. Ready to launch." in service.diagnostics(game)
     proxy.write_bytes(b"changed")
     guide = service.setup_guide(game)

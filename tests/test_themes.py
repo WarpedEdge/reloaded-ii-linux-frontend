@@ -29,7 +29,7 @@ def test_theme_preview_cancel_and_persistence(tmp_path, monkeypatch):
     ]
     dialog.theme_buttons["light"].click()
     assert app.palette().color(QPalette.Window).name() == themes.THEMES["light"]["window"]
-    assert themes.colors()["success"] in step_markup({"stage": 6})
+    assert themes.colors()["progress_success"] in step_markup({"stage": 6})
     dialog.reject()
     assert app.property("managerTheme") == "dark"
     assert load_settings()["theme"] == "dark"
@@ -64,8 +64,44 @@ def test_all_theme_palettes_have_readable_text_and_previews():
             ("success", "window"),
             ("warning", "base"),
             ("error", "base"),
+            ("progress_success", "window"),
+            ("progress_pending", "window"),
+            ("progress_error", "window"),
         ]:
             a, b = sorted((luminance(palette[foreground]), luminance(palette[background])))
             assert (b + 0.05) / (a + 0.05) >= 4.5, (key, foreground, background)
     themes.apply("unknown")
     assert themes.colors() == themes.THEMES["dark"]
+
+
+def test_theme_cards_remain_equal_sized_across_palettes(tmp_path, monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    parent = PreviewWindow()
+    dialog = SettingsDialog(load_settings(), parent)
+    for key in ("ivalice", "cyberpunk", "breeze-dark", "breeze-light"):
+        dialog.theme_buttons[key].click()
+        app.processEvents()
+        assert {(button.width(), button.height()) for button in dialog.theme_buttons.values()} == {(164, 124)}
+    dialog.reject()
+    themes.apply("dark")
+
+
+def test_cyberpunk_primary_action_and_fft_menu_styling(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QPushButton
+
+    _app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    themes.apply("cyberpunk")
+    button = QPushButton("Launch")
+    button.setObjectName("primaryAction")
+    button.resize(160, 48)
+    assert button.grab().toImage().pixelColor(10, 10).name() == themes.THEMES["cyberpunk"]["accent"]
+    button.setEnabled(False)
+    assert button.grab().toImage().pixelColor(10, 10).name() == themes.THEMES["cyberpunk"]["primary_disabled"]
+    themes.apply("ivalice")
+    assert themes.colors()["name"] == "Ivalice (FFT)"
+    assert "ridge" in _app.styleSheet()
+    assert "background-image" not in _app.styleSheet()
+    themes.apply("dark")

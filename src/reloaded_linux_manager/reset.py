@@ -83,6 +83,7 @@ def full_reset(game, report):
     report("Backing up the full Reloaded-II setup to " + str(root))
     try:
         service.remove_asi(game)
+        shortcuts.remove_menu_shortcut(game)
         for entry in journal["files"]:
             path = Path(entry["path"])
             entry["after"] = digest(path) if path.exists() else None

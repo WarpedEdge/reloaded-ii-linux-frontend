@@ -171,7 +171,11 @@ def diagnostics(game):
                 else "PENDING: Steam DLL override needs review (may differ between Steam accounts)."
             )
     if guide["stage"] == 6:
-        messages.append("OK: Setup checks passed. Ready to launch.")
+        messages.append(
+            "INFO: Launch options copied; paste into Steam. Saved Steam setting not yet detected."
+            if guide.get("options_status") == "copied"
+            else "OK: Setup checks passed. Ready to launch."
+        )
     else:
         messages.append(
             "PENDING: Complete the remaining setup steps. Logs show recorded launch and loader errors."
@@ -182,25 +186,15 @@ def diagnostics(game):
 def remove_asi(game):
     state = read_json(metadata(game), {})
     if not state.get("asi"):
-        from .shortcuts import remove_menu_shortcut
-
-        return "No managed ASI integration to remove.\n" + remove_menu_shortcut(game)
+        return "No managed ASI deployment to reset. Reloaded-II, mods and application shortcut kept."
     conflicts = Transaction.rollback(Path(state["asi"]["transaction"]))
     if conflicts:
         raise ValueError("Preserved modified files; remove manually after review: " + ", ".join(conflicts))
-    from .shortcuts import remove_menu_shortcut
-
-    try:
-        shortcut_note = remove_menu_shortcut(game)
-    except (OSError, ValueError) as exc:
-        shortcut_note = "Application shortcut was preserved and needs review: " + str(exc)
     state.pop("asi")
     state.pop("playtest", None)
+    state.pop("launch_options_copied", None)
     write_json(metadata(game), state)
-    return (
-        "Managed ASI files removed. Remove its DLL override in Steam if no longer needed. Reloaded-II, mods and runtimes preserved.\n"
-        + shortcut_note
-    )
+    return "ASI deployment reset. Reloaded-II, mods and application shortcut kept. Remove its DLL override in Steam if no longer needed."
 
 
 def setup_guide(game):
@@ -247,7 +241,7 @@ def setup_guide(game):
             "button": "Open Reloaded-II",
             "heading": "Add your game in Reloaded-II",
             "text": "In the Reloaded-II window, choose Add Application and select your game's .exe. "
-            "For FFT, choose FFT_enhanced.exe or FFT_classic.exe. Then close Reloaded-II to continue here.",
+            "For FFT, choose FFT_enhanced.exe or FFT_classic.exe. After adding mods, select the game and leave Reloaded-II open for a moment to finish downloading dependencies before closing it.",
         }
     state = read_json(metadata(game), {})
     if not state.get("asi"):
@@ -279,7 +273,9 @@ def setup_guide(game):
         )
     except ValueError:
         configured = False
-    if not configured:
+    copied = read_json(metadata(game), {}).get("launch_options_copied", {})
+    copied = copied.get("dll") == dll
+    if not configured and not copied:
         return {
             "stage": 4,
             "action": "options",
@@ -292,9 +288,15 @@ def setup_guide(game):
         "stage": 6,
         "action": "launch_game",
         "button": "Launch game in Steam",
-        "heading": "Ready",
-        "text": "Open Reloaded-II to install and enable compatible mods. You can launch the game from Reloaded-II, this app, or Steam. "
-        "Configuration checks passed. Mod compatibility still depends on the mods you enable.",
+        "heading": "Ready" if configured else "Paste your copied options into Steam",
+        "options_status": "detected" if configured else "copied",
+        "text": (
+            "Steam launch options detected. "
+            if configured
+            else "Launch options copied. Paste them into Steam → game Properties → General before launching. The saved Steam setting has not been detected yet. "
+        )
+        + "Open Reloaded-II to install and enable compatible mods. You can launch the game from Reloaded-II, this app, or Steam. "
+        "After adding mods, select this game in Reloaded-II and leave it open for a moment to finish downloading dependencies before closing it. Mod compatibility depends on the mods you enable.",
     }
 
 

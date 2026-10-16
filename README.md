@@ -18,7 +18,7 @@ No root privileges, system package changes, Docker or Distrobox are required dur
 
 ## Use with FFT
 
-Selecting a game checks its setup and shows one recommended action. Refresh, Add game, Settings and About live in the top toolbar. The library is alphabetical, with local art, application-menu/Steam icons, and embedded EXE icons where available; right-click to favorite a game and pin it above the rest. Progress is shown at the top right (green complete, red failed, blue pending). **Ready** means registration, managed loader files and Steam launch options passed configuration checks, not that every mod is compatible. Activity, Logs and readable Setup details appear in the lower panel. Steam runtimes and Proton packages are hidden from the picker.
+Selecting a game checks its setup and shows one recommended action. Refresh, Add game, Settings and About live in the top toolbar. The library is alphabetical, with local art, application-menu/Steam icons, and embedded EXE icons where available; right-click to favorite a game and pin it above the rest. Progress is shown at the top right (green complete, red failed, blue pending). **Ready** means registration, managed loader files, Steam launch options passed configuration checks, not that every mod is compatible. Activity, Logs and readable Setup details appear in the lower panel. Steam runtimes and Proton packages are hidden from the picker.
 
 1. Install FINAL FANTASY TACTICS - The Ivalice Chronicles (App ID `1004640`), select Proton in Steam, and launch it once. Exit the game.
 2. Open this manager, select FFT, and review its detected library, prefix, and compatibility tool. Refresh after changing Steam settings.
@@ -37,7 +37,7 @@ Read-only checks on the locally installed FFT Classic and Enhanced executables f
 
 **Add manager to applications** installs `Reloaded-Linux-Manager.desktop` in the same location, pointing to the original AppImage. Neither button asks for a save location. Source runs use the local built AppImage or ask you to locate it. Reloaded-II shortcuts use the official Windows launcher’s embedded R icon with the game’s artwork badged at the bottom right, copied to persistent user data. The manager uses the supplied Linux-Reloaded-Manager artwork for its window, AppImage and application-menu launcher. Reinstall Reloaded-II refreshes an existing managed shortcut’s icon.
 
-Each application button switches to Remove when its managed shortcut exists, and back to Add after removal. Only tracked, unchanged entries are replaced or removed. Unrelated and externally edited entries are preserved with an explanation. Reinstall Reloaded-II refreshes an existing game shortcut; Disconnect Steam mod loading also removes the game's managed shortcut. Disconnect preserves mods; a full reset moves them into a backup. No operation deletes the Proton prefix. Old shortcuts saved onto the desktop by earlier development builds are not silently removed.
+Each application button switches to Remove when its managed shortcut exists, and back to Add after removal. Only tracked, unchanged entries are replaced or removed. Unrelated and externally edited entries are preserved with an explanation. Reinstall Reloaded-II refreshes an existing game shortcut; Reset ASI Deployment keeps the game's application shortcut. Disconnect preserves mods; a full reset moves them into a backup. No operation deletes the Proton prefix. Old shortcuts saved onto the desktop by earlier development builds are not silently removed.
 
 ## Logs and setup checks
 
@@ -45,7 +45,7 @@ Logs, Activity and Setup details highlight errors in red and warnings or pending
 
 Setup turns green automatically when its configuration checks pass; no manual verification is required. Logs has separate Manager, Protontricks and Reloaded-II sources, with a file selector for game logs. A highlighted source button indicates unread content. Configuration checks cannot prove every mod works, and logs can only report failures that were recorded.
 
-The Ready text explains that games can be launched from Reloaded-II, this frontend, or Steam. Disconnect Steam mod loading removes the manager’s loader files and game shortcut while keeping Reloaded-II, mods, saves and the Windows environment. Steam launch options remain under your control and may need manual cleanup.
+The Ready text explains that games can be launched from Reloaded-II, this frontend, or Steam. Reset ASI Deployment resets the manager’s loader files while keeping Reloaded-II, mods, saves and the Windows environment. Steam launch options remain under your control and may need manual cleanup.
 
 ## Manager updates and About
 
@@ -62,7 +62,7 @@ The AppImage and its containing folder must be writable; symlink targets are not
 - Existing Reloaded configuration pointing to another installation is detected and **blocks automatic installation**. Migration/adoption needs additional testing. This prevents taking over another manager's setup.
 - Repair and Update run the same validated, backed-up installation pipeline. The default is the latest official release; the installed version is shown in About. Mods, apps, profiles and user configuration are excluded from release replacement. Releases lacking GitHub asset SHA-256 digests are rejected.
 - ASI deployment refuses existing supported proxy DLLs or ASI plugins. Review conflicting loaders manually; this version does not offer an overwrite path.
-- Disconnect Steam mod loading rolls back unchanged ASI files created by this manager. It preserves Reloaded-II, mods, runtimes and the entire prefix. Remove the related override in Steam yourself if no longer needed.
+- Reset ASI Deployment rolls back unchanged ASI files created by this manager. It preserves Reloaded-II, mods, runtimes and the entire prefix. Remove the related override in Steam yourself if no longer needed.
 - Install failures roll back manager-written files. Backups and transaction journals live under `$XDG_STATE_HOME/reloaded-linux-manager/games/` (normally `~/.local/state/...`). `Transaction.rollback()` is available to developers for recovering an installation transaction; there is not yet a GUI for arbitrary historical rollback. Upstream Windows runtime/registry changes cannot be undone by these file journals.
 - If another program changes a managed file, rollback reports a conflict and preserves it. No repair operation deletes or resets a prefix.
 
@@ -74,7 +74,7 @@ Native and Flatpak Steam roots are probed, then `libraryfolders.vdf` and `appman
 
 Settings contains startup update checks, an explained download-cache location and readable log-detail levels. Advanced game discovery hides the rarely needed extra Steam/library folder controls behind an explanatory section. Protontricks is detected automatically. Add game manually accepts a Windows `.exe` or a real Steam app manifest, matches executables to their Steam manifest, and asks for the owning Steam root only when needed. All file/folder dialogs show hidden entries such as `.local` and `.steam`, have larger text/navigation controls, and retain a Look in dropdown that also accepts pasted paths (press Enter to navigate). Executables outside a Steam manifest-backed library and non-Steam shortcut prefixes remain unsupported; no App IDs or prefixes are invented. Select Existing Prefix helps diagnose custom locations; launching a custom/cross-library prefix is deliberately blocked because `--appid` cannot guarantee routing to it. Uninitialized or ambiguous prefixes are never synthesized. Native Linux titles and Steam runtime/tool manifests may appear in the library; selecting one does not imply Proton support.
 
-The UI remains responsive during discovery, downloads, extraction and child processes. Mutating actions are serialized. While Reloaded-II runs, other actions are disabled; close Reloaded-II to continue. Controller use benefits from standard Qt focus/tab navigation and large buttons, but full gamepad navigation is not implemented.
+The UI remains responsive during discovery, downloads, extraction and child processes. Mutating actions are serialized. While Reloaded-II runs, other actions are disabled; close Reloaded-II to continue. Standard Qt mouse and keyboard navigation remains available.
 
 ## AppImage
 
@@ -109,7 +109,7 @@ While the manager runs, it retains the newest three Reloaded-II text logs for th
 
 ## Appearance and settings
 
-Settings has Appearance, General and Advanced tabs. Appearance offers Dark (default), Light, OLED, Plum and Forest with live previews. Save persists the theme for future launches; Cancel restores your previous theme. Themes also adjust readable setup status colors, log highlighting and dialogs. General contains update checks, the download cache and log detail. Advanced contains optional Steam/library discovery folders.
+Settings has Appearance, General and Advanced tabs. Appearance offers 15 themes with live previews: Dark (default), Light, OLED, Plum, Forest, Cyberpunk, Ivalice (FFT), Amethyst, Mocha, Noir, Pip-Boy, Stardew, Tokyo Night and two Breeze-inspired palettes. Save persists the theme for future launches; Cancel restores your previous theme. Themes also adjust readable setup status colors, log highlighting and dialogs. General contains update checks, the download cache and log detail. Advanced contains optional Steam/library discovery folders.
 
 To add a built-in theme, add a named color-token palette in `src/reloaded_linux_manager/themes.py`. Its preview and selector appear automatically; no settings-layout changes are needed. Run the theme tests to check text contrast and saved/preview behavior. This initial version provides built-in themes; arbitrary theme-file importing and editing are not included.
 
@@ -117,9 +117,23 @@ To add a built-in theme, add a named color-token palette in `src/reloaded_linux_
 
 More actions provides distinct operations, each with a tooltip:
 
-- **Reinstall Reloaded-II…** downloads the selected official release and reinstalls program files/prerequisites while keeping mods, settings and registration. It may also update the installed release.
-- **Disconnect Steam mod loading…** rolls back manager-deployed ASI files and removes the game's application shortcut. Reloaded-II and mods remain installed.
-- **Reset all Reloaded-II setup…** returns the selected game to the first setup step. After confirmation, it moves the managed installation (including mods/profiles) and Reloaded-II configuration into `PREFIX/drive_c/ReloadedLinuxManager/ResetBackups/ID`, restores game files changed by ASI deployment, removes the game shortcut and clears setup state. The backup location appears in Activity. External/shared configurations and conflicting loader files stop the reset for review.
+- **Reinstall Reloaded-II** downloads the latest official release and reinstalls program files/prerequisites while keeping mods, settings and registration. It may also update the installed release.
+- **Reset ASI Deployment…** rolls back manager-deployed ASI files and keeps the game's application shortcut. Reloaded-II and mods remain installed.
+- **Reset All** returns the selected game to the first setup step. After confirmation, it moves the managed installation (including mods/profiles) and Reloaded-II configuration into `PREFIX/drive_c/ReloadedLinuxManager/ResetBackups/ID`, restores game files changed by ASI deployment, removes the game shortcut and clears setup state. The backup location appears in Activity. External/shared configurations and conflicting loader files stop the reset for review.
 - **Restore last full reset…** restores the saved installation, settings, loader integration and game shortcut. A new setup or changed loader files are preserved instead of overwritten.
 
 Close the game and Reloaded-II before reset/restore. All operations keep the game, saves, Proton prefix, installed Windows runtimes and manager application shortcut. Steam launch options are not edited; review/remove the old Reloaded-II override in Steam when disconnecting or resetting. Other launch parameters are preserved. Full reset backups remain until you remove them; they can be large if you installed many mods.
+
+## Dependency downloads and Steam settings
+
+On the first launch through the manager, a reminder asks you to select your game in Reloaded-II after adding mods and leave it open for a moment so required dependencies can download. Wait for downloads/popups to finish before closing it. There is no separate dependency checklist or dependency-based launch blocking.
+
+The Steam launch options dialog reads Steam's saved per-account settings, preserves existing parameters and shows whether the required ASI override is detected. It can reread these settings with **Check Steam settings**; Steam may take a moment to save a recent edit. Multiple saved values can belong to different accounts and must be reviewed. The manager never writes Steam configuration files.
+
+Copying the generated options advances the setup handoff, with a reminder to paste into Steam → Properties → General → Launch Options. The progress label says **Launch options copied** until the saved value is detected; it does not claim that copying changed Steam. The override syntax is generally `WINEDLLOVERRIDES="DLLNAME=n,b" %command%`, but DLLNAME depends on the deployed loader/game.
+
+Reset All cannot reconstruct the pre-runtime state of existing prefixes: there is no record proving which shared VC++/.NET components were already there. It therefore keeps Windows runtimes and does not claim to uninstall them or reset the whole prefix.
+
+Theme previews use equal-sized cards. Component styles cover tabs, menus, inputs, scrollbars and primary/disabled buttons instead of depending on desktop defaults. Cyberpunk uses cyan text, red outlines and yellow primary actions. Ivalice uses FFT-inspired gray-olive menu panels, dark ink and raised borders. Its palette does not add a game-scene backdrop. Setup progress uses larger bold markers and separate, high-contrast status colors, including a green-toned Pip-Boy variant.
+
+The runtime-removal requirements and current limitations are documented in [docs/RUNTIME_REMOVAL.md](docs/RUNTIME_REMOVAL.md).
