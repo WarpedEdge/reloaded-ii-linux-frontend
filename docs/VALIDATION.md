@@ -40,3 +40,14 @@ Use a game with documented Reloaded-II support and a separate test setup. Keep e
 8. Build on Ubuntu 22.04 CI and run on the target distributions listed in the README. Check X11, Wayland, Steam Deck sizing, FUSE-free launch, certificates and subprocess library paths.
 
 The manager uses generic setup checks. Finding a game or showing Ready does not establish that the game supports Reloaded-II or that every enabled mod works.
+
+
+## HTTPS certificates
+
+Update checks and release downloads share a verified SSL context that loads the host defaults and the bundled certifi CA set. Tests check that trusted roots remain available with nonexistent host CA paths, hostname and certificate verification remain enabled, and certificate failures never trigger an unverified retry. Existing HTTP rate-limit handling is preserved.
+
+The build explicitly collects certifi and its certificate data. CI runs `--check-https` against GitHub with nonexistent `SSL_CERT_FILE` and `SSL_CERT_DIR` paths. This tests the packaged trust store without relying on the build host's certificate locations. Physical Steam Deck verification still needs tester confirmation.
+
+## Short-screen layout
+
+The setup summary and action buttons scroll above the Activity/Logs/Setup details tabs, allowing the window to fit shorter screens. Physical Steam Deck maximize/taskbar behavior still needs tester confirmation.

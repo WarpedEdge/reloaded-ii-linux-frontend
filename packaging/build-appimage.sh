@@ -8,7 +8,7 @@ if [ ! -f "$RLM_LIBARCHIVE" ]; then
     exit 1
 fi
 python -m PyInstaller --noconfirm --clean --windowed --name reloaded-linux-manager \
-    --collect-all libarchive --collect-all vdf --add-binary "$RLM_LIBARCHIVE:." \
+    --collect-all libarchive --collect-all vdf --collect-all certifi --add-binary "$RLM_LIBARCHIVE:." \
     --runtime-hook packaging/runtime-hook.py --add-data "packaging/reloaded-linux-manager.png:." packaging/entry.py
 rm -rf AppDir
 mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/512x512/apps

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pefile
 
-from .storage import Transaction, digest, read_json
+from .storage import Transaction, digest, read_json, state_home
 
 DLL32 = (
     "version",
@@ -73,11 +73,16 @@ def merge_options(existing, dll):
 
 
 def config_files(game):
-    return (
-        list((game.prefix / "drive_c/users").glob("*/AppData/Roaming/Reloaded-Mod-Loader-II/ReloadedII.json"))
-        if game.prefix
-        else []
-    )
+    if not game.prefix:
+        return []
+    # Proton aliases the Linux username to steamuser in some prefixes.
+    # Preserve the original path for ownership checks, but count each resolved file once.
+    configs = {}
+    for path in sorted(
+        (game.prefix / "drive_c/users").glob("*/AppData/Roaming/Reloaded-Mod-Loader-II/ReloadedII.json")
+    ):
+        configs.setdefault(path.resolve(), path)
+    return list(configs.values())
 
 
 def windows_path_to_linux(value, prefix):
@@ -102,7 +107,7 @@ def windows_path_to_linux(value, prefix):
     return current.resolve()
 
 
-def deploy(game, exe, backup_root):
+def deploy(game, exe, backup_root, reclaim=False):
     exe = exe.resolve()
     if not exe.is_relative_to(game.directory.resolve()):
         raise ValueError("Select the game executable inside its Steam installation.")
@@ -143,6 +148,8 @@ def deploy(game, exe, backup_root):
         str(p.relative_to(folder)) for sub in ("scripts", "plugins") for p in (folder / sub).glob("*.asi")
     ]
     if conflicts:
+        if reclaim:
+            return reclaim_asi(game, exe, backup_root)
         raise ValueError(
             "Existing DLL/ASI files require manual review; nothing overwritten: " + ", ".join(conflicts)
         )
@@ -171,6 +178,66 @@ def deploy(game, exe, backup_root):
             str(p): digest(p)
             for p in (folder / (dll + ".dll"), folder / "Reloaded.Mod.Loader.Bootstrapper.asi")
         },
+    }
+
+
+def reclaim_asi(game, exe, backup_root):
+    """Adopt only an unchanged official pair previously installed without replacing files."""
+    exe = exe.resolve()
+    if not exe.is_file() or not exe.is_relative_to(game.directory.resolve()):
+        raise ValueError("Choose the game executable inside this game's folder.")
+    is64, dll = executable_info(exe)
+    paths = [exe.parent / (dll + ".dll"), exe.parent / "Reloaded.Mod.Loader.Bootstrapper.asi"]
+    extras = [
+        p
+        for p in exe.parent.iterdir()
+        if p not in paths and (p.name.lower() in {n + ".dll" for n in DLL32} or p.suffix.lower() == ".asi")
+    ]
+    extras += [p for sub in ("scripts", "plugins") for p in (exe.parent / sub).glob("*.asi")]
+    if extras:
+        raise ValueError("Other DLL/ASI files need manual review. Nothing changed.")
+    if any(p.is_symlink() or not p.is_file() for p in paths):
+        raise ValueError("No complete, regular loader pair to reclaim. Nothing changed.")
+    hashes = {p.name: digest(p) for p in paths}
+    import hashlib
+
+    bootstrap = (
+        game.install
+        / "Loader"
+        / ("X64" if is64 else "X86")
+        / "Bootstrapper/Reloaded.Mod.Loader.Bootstrapper.dll"
+    )
+    archive = game.install / "Loader/Asi/UltimateAsiLoader.7z"
+    if (
+        not bootstrap.is_file()
+        or not archive.is_file()
+        or hashes[paths[0].name] != hashlib.sha256(extract_asi(archive, is64)).hexdigest()
+        or hashes[paths[1].name] != digest(bootstrap)
+    ):
+        raise ValueError("Leftover files do not match this installation's official assets. Nothing changed.")
+    found = False
+    for record in (state_home() / "games").glob("*/backups/*/transaction.json"):
+        try:
+            entries = read_json(record)["files"]
+            known = {Path(e["path"]).name: e for e in entries}
+            if all(
+                name in known and known[name]["sha256"] == value and known[name]["backup"] is None
+                for name, value in hashes.items()
+            ):
+                found = True
+                break
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    if not found:
+        raise ValueError("No previous manager deployment matches these files. Nothing changed.")
+    transaction = Transaction(backup_root, "Reclaimed ASI deployment")
+    transaction.record["files"] = [{"path": str(p), "backup": None, "sha256": hashes[p.name]} for p in paths]
+    transaction.save()
+    return {
+        "dll": dll,
+        "exe": str(exe),
+        "transaction": str(transaction.root),
+        "files": {str(p): hashes[p.name] for p in paths},
     }
 
 

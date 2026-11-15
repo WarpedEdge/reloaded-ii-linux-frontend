@@ -39,7 +39,9 @@ def full_reset(game, report):
                     )
         if config.parent.is_symlink() or not config.parent.resolve().is_relative_to(game.prefix.resolve()):
             raise ValueError("Reloaded-II configuration is linked outside this prefix; preserved.")
-        folders.append(config.parent)
+        # Proton may expose the same user directory through a username alias.
+        # Move its canonical folder once so aliases cannot become missing mid-reset.
+        folders.append(config.parent.resolve())
     asi = state.get("asi", {})
     if asi and not Path(asi["transaction"]).resolve().is_relative_to(service.backups(game).resolve()):
         raise ValueError("ASI backup location is not managed; reset cancelled.")

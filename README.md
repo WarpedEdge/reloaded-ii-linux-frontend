@@ -151,7 +151,7 @@ The output is `dist/Reloaded-Linux-Manager-x86_64.AppImage` and `dist/SHA256SUMS
 
 The GitHub Actions workflow builds on Ubuntu 22.04 and creates draft releases for version tags. Update the package and application versions together before tagging; CI checks that they match.
 
-AppImage bundles Python, Qt and application dependencies, including libarchive. It still depends on the host kernel, glibc, graphics drivers and some display libraries. It does not bundle Steam, Proton or Protontricks. The CI build targets glibc 2.35; local builds on newer systems may require newer glibc. X11 and Wayland need testing on each target desktop. `QT_QPA_PLATFORM=xcb` can be used with XWayland if the Wayland plugin cannot load.
+AppImage bundles Python, Qt and application dependencies, including libarchive and public HTTPS root certificates. Update checks and downloads use those certificates alongside host trust settings; certificate verification stays enabled. It still depends on the host kernel, glibc, graphics drivers and some display libraries. It does not bundle Steam, Proton or Protontricks. The CI build targets glibc 2.35; local builds on newer systems may require newer glibc. X11 and Wayland need testing on each target desktop. `QT_QPA_PLATFORM=xcb` can be used with XWayland if the Wayland plugin cannot load.
 
 Bazzite, SteamOS, Fedora, Ubuntu, Debian, Linux Mint, Arch, EndeavourOS and openSUSE are testing targets, not guaranteed compatible systems. ARM and 32-bit systems are unsupported. Non-Steam prefixes, automatic prefix creation and automatic migration from other managers are unsupported.
 

@@ -10,9 +10,10 @@ import shutil
 import tempfile
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from . import __version__
+from .network import open_url
 from .releases import github_error_message
 from .storage import digest
 
@@ -23,7 +24,7 @@ ASSET_NAME = "Reloaded-Linux-Manager-x86_64.AppImage"
 
 
 def request(url):
-    return urlopen(
+    return open_url(
         Request(
             url,
             headers={

@@ -51,6 +51,11 @@ jobs:
         run: |
           dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --smoke-test
           dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --check-asi "$PWD/tests/fixtures/asi-bcj2.7z"
+      - name: Check bundled HTTPS certificates without host CA paths
+        env:
+          SSL_CERT_FILE: /nonexistent/host-certificates.pem
+          SSL_CERT_DIR: /nonexistent/host-certificates
+        run: dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --check-https
       - uses: actions/upload-artifact@v4
         with:
           name: Reloaded-Linux-Manager-x86_64

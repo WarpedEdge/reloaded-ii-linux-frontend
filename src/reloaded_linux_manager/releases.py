@@ -11,15 +11,16 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError
 from urllib.parse import quote, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
+from .network import open_url
 from .storage import cache_home, read_json, write_json
 
 API = "https://api.github.com/repos/Reloaded-Project/Reloaded-II/releases/"
 
 
 def request(url):
-    return urlopen(
+    return open_url(
         Request(
             url, headers={"User-Agent": "Reloaded-Linux-Manager/0.1", "Accept": "application/vnd.github+json"}
         ),

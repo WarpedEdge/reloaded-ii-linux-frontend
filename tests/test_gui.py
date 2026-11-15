@@ -245,7 +245,8 @@ def test_copy_options_records_handoff_and_menu_order(tmp_path, monkeypatch):
         if not window.workers:
             break
     write_json(service.metadata(game), {"asi": {"dll": "version"}})
-    assert [action.text() for action in window.more_menu.actions()] == [
+    assert [action.text() for action in window.more_menu.actions() if action.isVisible()] == [
+        "Review leftover ASI files…",
         "Select Existing Prefix",
         "Reinstall Reloaded-II",
         "Reset ASI Deployment",

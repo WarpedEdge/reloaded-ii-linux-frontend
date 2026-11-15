@@ -467,7 +467,17 @@ class Window(QMainWindow):
         library_layout.addWidget(library_hint)
         splitter.addWidget(sidebar)
         right = QWidget()
-        panel = QVBoxLayout(right)
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        setup_content = QWidget()
+        panel = QVBoxLayout(setup_content)
+        self.details_scroll = QScrollArea()
+        self.details_scroll.setFrameShape(QScrollArea.NoFrame)
+        self.details_scroll.setWidgetResizable(True)
+        self.details_scroll.setWidget(setup_content)
+        # Wrapped paths and setup text must scroll rather than grow a maximized window.
+        self.details_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        right_layout.addWidget(self.details_scroll)
         header = QHBoxLayout()
         summary = QVBoxLayout()
         self.title = QLabel("Select a Steam game")
@@ -535,6 +545,7 @@ class Window(QMainWindow):
         self.more.setPopupMode(QToolButton.InstantPopup)
         self.more_menu = QMenu(self.more)
         self.more_menu.setToolTipsVisible(True)
+        self.more_menu.addAction("Review leftover ASI files…", self.review_leftover_asi)
         for label, action, tooltip in [
             (
                 "Select Existing Prefix",
@@ -608,7 +619,7 @@ class Window(QMainWindow):
         setup_layout.addWidget(self.setup_output)
         self.tabs.addTab(setup_panel, "Setup details")
         self.tabs.currentChanged.connect(self.display_tab)
-        panel.addWidget(self.tabs, 1)
+        right_layout.addWidget(self.tabs, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(1, 2)
         outer.addWidget(splitter, 1)
@@ -741,7 +752,16 @@ class Window(QMainWindow):
         self.log_panel.refresh()
         self.more.setEnabled(bool(game) and not self.busy)
         self.reset_action.setEnabled(bool(game and game.prefix) and not self.busy)
-        self.restore_action.setEnabled(bool(game and reset.pointer(game).is_file()) and not self.busy)
+        saved_reset = read_json(reset.pointer(game), {}) if game else {}
+        restorable = bool(
+            game
+            and game.prefix
+            and saved_reset.get("backup")
+            and Path(saved_reset["backup"]).is_relative_to(
+                game.prefix / "drive_c/ReloadedLinuxManager/ResetBackups"
+            )
+        )
+        self.restore_action.setEnabled(restorable and not self.busy)
         if not game:
             self.title.setText("Select a Steam game")
             self.info.clear()
@@ -914,6 +934,54 @@ class Window(QMainWindow):
         if self.game:
             game = self.game
             self.work(lambda _: "\n".join(service.diagnostics(game)))
+
+    def review_leftover_asi(self):
+        game = self.game
+        if not game:
+            return
+        filename = choose_path(
+            self,
+            "Select game executable beside leftover ASI files",
+            game.directory,
+            "Windows executable (*.exe *.EXE)",
+        )
+        if not filename:
+            return
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Review leftover ASI files")
+        dialog.setText(
+            "Close the game and Reloaded-II first. Only an official loader pair matching a previous manager deployment can be recovered.\n\n"
+            "Reclaim attaches the files to this setup so future resets can remove them. Remove deletes the verified pair so you can deploy again. Unknown or changed files are preserved."
+        )
+        reclaim = dialog.addButton("Reclaim", QMessageBox.AcceptRole)
+        remove = dialog.addButton("Remove", QMessageBox.DestructiveRole)
+        dialog.addButton(QMessageBox.Cancel)
+        dialog.exec()
+        if dialog.clickedButton() not in (reclaim, remove):
+            return
+        removing = dialog.clickedButton() == remove
+
+        def action(report):
+            from .integration import reclaim_asi
+
+            state = read_json(service.metadata(game), {})
+            if state.get("asi"):
+                raise ValueError(
+                    "This setup already owns an ASI deployment. Use Reset ASI Deployment instead."
+                )
+            report("Verifying leftover loader files against official assets and prior deployment records…")
+            state["asi"] = (
+                reclaim_asi(game, Path(filename), service.backups(game))
+                if removing
+                else deploy(game, Path(filename), service.backups(game), reclaim=True)
+            )
+            write_json(service.metadata(game), state)
+            if removing:
+                service.remove_asi(game)
+                return "Verified leftover ASI files removed. You can enable mod loading again."
+            return "ASI files reclaimed. This setup's reset operations now manage them."
+
+        self.work(action)
 
     def options(self):
         game = self.game
@@ -1393,6 +1461,10 @@ def main():
     parser = argparse.ArgumentParser(description="Native setup companion for official Reloaded-II")
     parser.add_argument("--version", action="version", version=f"Reloaded Linux Manager {__version__}")
     parser.add_argument(
+        "--check-https", action="store_true",
+        help="Check verified GitHub HTTPS access without looking up a release",
+    )
+    parser.add_argument(
         "--smoke-test", action="store_true", help="Open Qt, discover Steam, and exit without game changes"
     )
     parser.add_argument(
@@ -1402,6 +1474,11 @@ def main():
         help="Validate ASI archive decoding without executing its contents",
     )
     args = parser.parse_args()
+    if args.check_https:
+        from .network import check_https
+
+        print(check_https(), flush=True)
+        return
     if args.check_asi:
         payload = extract_asi(args.check_asi, True)
         print(f"ASI x64 archive decoded: {len(payload)} bytes")

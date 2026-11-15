@@ -92,6 +92,23 @@ def test_reset_refuses_changed_asi_and_external_config(tmp_path, monkeypatch):
     assert dll.read_bytes() == b"loader"
 
 
+def test_reset_and_restore_with_proton_username_alias(tmp_path, monkeypatch):
+    game, config, dll, save = setup_game(tmp_path, monkeypatch)
+    alias = game.prefix / "drive_c/users/WarpedEdge"
+    alias.symlink_to("steamuser", target_is_directory=True)
+    reset.full_reset(game, lambda _: None)
+    root = Path(read_json(reset.pointer(game))["backup"])
+    journal = read_json(root / "reset.json")
+    assert len(journal["moves"]) == 2
+    assert not config.exists()
+    assert alias.is_symlink()
+    assert save.read_bytes() == b"save"
+    reset.restore(game)
+    assert config.is_file()
+    assert (alias / "AppData/Roaming/Reloaded-Mod-Loader-II/ReloadedII.json").is_file()
+    assert dll.read_bytes() == b"loader"
+
+
 def test_restore_refuses_to_overwrite_fresh_setup(tmp_path, monkeypatch):
     game, _, _, _ = setup_game(tmp_path, monkeypatch)
     reset.full_reset(game, lambda _: None)
