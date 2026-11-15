@@ -34,12 +34,13 @@ jobs:
               package_version = tomllib.load(source)['project']['version']
           assert version_tuple(os.environ['RELEASE_TAG']) == version_tuple(__version__) == version_tuple(package_version), 'Set manager and package versions to the release tag before building.'
           PY
+      # Keep the release and checksum pinned together; continuous assets are replaced upstream.
       - name: Download and verify build tool
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download continuous --repo AppImage/appimagetool --pattern appimagetool-x86_64.AppImage --dir /tmp
-          echo '95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6  /tmp/appimagetool-x86_64.AppImage' | sha256sum -c -
+          gh release download 1.9.1 --repo AppImage/appimagetool --pattern appimagetool-x86_64.AppImage --dir /tmp
+          echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  /tmp/appimagetool-x86_64.AppImage' | sha256sum -c -
           chmod +x /tmp/appimagetool-x86_64.AppImage
       - name: Build AppImage
         env:
