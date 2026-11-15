@@ -1461,7 +1461,8 @@ def main():
     parser = argparse.ArgumentParser(description="Native setup companion for official Reloaded-II")
     parser.add_argument("--version", action="version", version=f"Reloaded Linux Manager {__version__}")
     parser.add_argument(
-        "--check-https", action="store_true",
+        "--check-https",
+        action="store_true",
         help="Check verified GitHub HTTPS access without looking up a release",
     )
     parser.add_argument(
