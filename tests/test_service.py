@@ -33,6 +33,7 @@ def prepared(tmp_path, monkeypatch):
     directory = library / "steamapps/common/Example Game"
     directory.mkdir(parents=True)
     game = Game("123456", "Example Game", directory, library, tmp_path / "steam", prefix, "GE-Proton")
+    (tmp_path / "Setup-Linux.exe").write_bytes(b"verified installer fixture")
     archive = tmp_path / "Release.zip"
     with zipfile.ZipFile(archive, "w") as output:
         for name in [
@@ -62,10 +63,18 @@ def test_install_preserves_mods_and_uses_official_dependencies_mode(tmp_path, mo
     mod.write_bytes(b"user mod")
     write_json(service.metadata(game), {"installed": True})
     calls = []
-    monkeypatch.setattr(service.proton, "run", lambda *args: calls.append(args))
+
+    def run(*args):
+        staged = args[1]
+        assert staged.is_relative_to(game.prefix / "drive_c")
+        assert staged.read_bytes() == b"verified installer fixture"
+        calls.append(args)
+
+    monkeypatch.setattr(service.proton, "run", run)
     result = service.install(game, {"cache": str(tmp_path)}, lambda _: None)
     assert "configuration is pending" in result
     assert mod.read_bytes() == b"user mod"
+    assert not calls[0][1].exists()
     assert calls[0][3] == [
         "--dependenciesOnly",
         "--nogui",
@@ -83,12 +92,17 @@ def test_runtime_failure_rolls_back_manager_files(tmp_path, monkeypatch):
     exe.write_bytes(b"original")
     write_json(service.metadata(game), {"installed": True, "version": "old"})
 
+    staged_paths = []
+
     def fail(*args):
+        assert args[1].is_file()
+        staged_paths.append(args[1])
         raise RuntimeError("runtime failure")
 
     monkeypatch.setattr(service.proton, "run", fail)
     with pytest.raises(RuntimeError, match="runtime failure"):
         service.install(game, {"cache": str(tmp_path)}, lambda _: None)
+    assert all(not path.exists() for path in staged_paths)
     assert exe.read_bytes() == b"original"
     assert not (game.install / "Loader/X64/Reloaded.Mod.Loader.dll").exists()
     assert read_json(service.metadata(game))["version"] == "old"

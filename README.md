@@ -32,7 +32,7 @@ Submit an issue via [here](https://github.com/WarpedEdge/reloaded-ii-linux-front
 - Steam and an installed game configured to use Proton.
 - [Protontricks](https://github.com/Matoking/protontricks#installation), installed natively or as `com.github.Matoking.protontricks` through Flatpak.
 
-Normal use requires no root access or system changes. Native and Flatpak Steam installations are supported. The manager itself is not sandboxed. Flatpak Protontricks may need permission to access the Steam library and download cache; the manager does not change these permissions.
+Normal use requires no root access or system changes. Native and Flatpak Steam installations are supported. The manager itself is not sandboxed. Flatpak Protontricks may need permission to access the Steam library; the manager does not change these permissions. The verified runtime installer is temporarily copied inside the selected Proton prefix before launch, so Protontricks does not need access to the manager’s download cache.
 
 ## Run the AppImage
 

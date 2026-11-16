@@ -96,13 +96,26 @@ def install(game, settings, report):
         # --installdir marks the location as explicitly supplied. Dependencies-only mode
         # replaces it with an upstream temporary directory; the flag prevents upstream's
         # Proton desktop-location override from redirecting that temporary installation.
-        proton.run(
-            game,
-            installer,
-            launcher,
-            ["--dependenciesOnly", "--nogui", "--installdir", r"C:\ReloadedLinuxManager\DependencyStaging"],
-            state_home() / "process.log",
-        )
+        # Flatpak and Steam's runtime may hide the host download cache. Run a
+        # verified copy from the same prefix that Protontricks already needs to access.
+        with tempfile.TemporaryDirectory(prefix="runtime-installer-", dir=target.parent) as temporary:
+            staged_installer = Path(temporary) / "Setup-Linux.exe"
+            shutil.copyfile(installer, staged_installer)
+            if digest(staged_installer) != digest(installer):
+                raise ValueError("Runtime installer staging verification failed.")
+            report("Runtime installer staged inside the selected Proton prefix: " + str(staged_installer))
+            proton.run(
+                game,
+                staged_installer,
+                launcher,
+                [
+                    "--dependenciesOnly",
+                    "--nogui",
+                    "--installdir",
+                    r"C:\ReloadedLinuxManager\DependencyStaging",
+                ],
+                state_home() / "process.log",
+            )
         state = previous | {
             "installed": True,
             "version": version,

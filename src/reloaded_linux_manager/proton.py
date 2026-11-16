@@ -22,7 +22,7 @@ def detect_launcher(custom=""):
             return [flatpak, "run", "--command=protontricks-launch", FLATPAK_ID]
     raise RuntimeError(
         "Install Protontricks (system package or com.github.Matoking.protontricks via Flatpak). "
-        "For Flatpak, grant access to the selected Steam library and download cache using Flatseal. "
+        "For Flatpak, grant access to the selected Steam library using Flatseal. "
         "See https://github.com/Matoking/protontricks#installation"
     )
 
