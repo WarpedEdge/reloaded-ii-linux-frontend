@@ -115,3 +115,18 @@ def test_correct_checksum_cannot_make_a_non_appimage_installable(tmp_path, monke
     with pytest.raises(ValueError, match="not a type-2 AppImage"):
         updater.install_update(path, asset(bad))
     assert path.read_bytes() == old
+
+
+def test_identical_release_asset_does_not_repeat_update(tmp_path, monkeypatch):
+    path = tmp_path / "manager.AppImage"
+    payload = image(b"same build with outdated embedded version")
+    path.write_bytes(payload)
+
+    def unexpected_download(_):
+        pytest.fail("An identical AppImage must not be downloaded again")
+
+    monkeypatch.setattr(updater, "request", unexpected_download)
+    with pytest.raises(ValueError, match="identical to the installed AppImage"):
+        updater.install_update(path, asset(payload))
+    assert path.read_bytes() == payload
+    assert not path.with_name(path.name + ".previous").exists()

@@ -149,7 +149,7 @@ PATH="$PWD/.venv/bin:$PATH" APPIMAGETOOL=/absolute/path/appimagetool.AppImage pa
 
 The output is `dist/Reloaded-Linux-Manager-x86_64.AppImage` and `dist/SHA256SUMS`. Close the old app and reopen the rebuilt file to test changes.
 
-The GitHub Actions workflow builds on Ubuntu 22.04 and creates draft releases for version tags. Update the package and application versions together before tagging; CI checks that they match.
+The GitHub Actions workflow builds on Ubuntu 22.04 and creates draft releases for version tags. Before building a release, set the matching version in both `pyproject.toml` and `src/reloaded_linux_manager/__init__.py`, then commit and tag that commit. CI checks tag versions and the packaged executable’s version. Naming a GitHub release does not change the version embedded in an existing AppImage; upload the newly built AppImage and its matching `SHA256SUMS`.
 
 AppImage bundles Python, Qt and application dependencies, including libarchive and public HTTPS root certificates. Update checks and downloads use those certificates alongside host trust settings; certificate verification stays enabled. It still depends on the host kernel, glibc, graphics drivers and some display libraries. It does not bundle Steam, Proton or Protontricks. The CI build targets glibc 2.35; local builds on newer systems may require newer glibc. X11 and Wayland need testing on each target desktop. `QT_QPA_PLATFORM=xcb` can be used with XWayland if the Wayland plugin cannot load.
 

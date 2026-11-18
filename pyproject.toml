@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reloaded-linux-manager"
-version = "0.1.0"
+version = "0.2.0"
 authors = [{name = "WarpedEdge"}]
 description = "Native Linux setup companion for official Reloaded-II under Steam Proton"
 requires-python = ">=3.11"

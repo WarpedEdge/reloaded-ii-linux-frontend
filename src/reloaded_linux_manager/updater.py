@@ -120,6 +120,12 @@ def install_update(target, asset, report=lambda _: None):
         except BlockingIOError as exc:
             raise RuntimeError("Another manager update is already running.") from exc
         original = digest(target)
+        if original == asset["digest"][7:]:
+            raise ValueError(
+                "The published update is identical to the installed AppImage, but its release tag "
+                "claims a newer version. The release needs a rebuilt AppImage with the correct "
+                "embedded version. Current AppImage was preserved."
+            )
         mode = target.stat().st_mode & 0o777
         fd, staging_name = tempfile.mkstemp(prefix=".rlm-update-", dir=target.parent)
         staged = Path(staging_name)

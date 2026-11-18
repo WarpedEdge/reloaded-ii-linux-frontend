@@ -46,6 +46,11 @@ jobs:
         env:
           APPIMAGETOOL: /tmp/appimagetool-x86_64.AppImage
         run: packaging/build-appimage.sh
+      - name: Verify packaged manager version
+        run: |
+          expected="$(python -c 'from reloaded_linux_manager import __version__; print("Reloaded Linux Manager " + __version__)')"
+          actual="$(dist/Reloaded-Linux-Manager-x86_64.AppImage --appimage-extract-and-run --version)"
+          test "$actual" = "$expected"
       - name: Smoke-test packaged Qt and bundled BCJ2 support
         env:
           QT_QPA_PLATFORM: offscreen
